@@ -38,6 +38,7 @@ using namespace dynamatic::experimental;
 
 /// Algorithms that do not require solving an MILP.
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
+static constexpr llvm::StringLiteral CUT_LOOPBACKS("cut-loopbacks");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"),
@@ -116,6 +117,8 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
       allAlgorithms;
   allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
+  allAlgorithms[CUT_LOOPBACKS] =
+      &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPGA20_LEGACY] = &HandshakePlaceBuffersPass::placeUsingMILP;
@@ -474,31 +477,61 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
     // Map all channels in the function to their specific buffering properties,
     // adjusting for internal buffers present inside the units
+
     llvm::MapVector<Value, ChannelBufProps> channelProps;
     if (failed(mapChannelsToProperties(funcOp, timingDB, channelProps)))
       return failure();
 
-    // Make sure that the data output channels of all merge-like operations have
-    // at least one opaque and one transparent slot, unless a constraint
-    // explicitly prevents us from putting a buffer there
-    for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
-      ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
-      if (resProps.maxTrans.value_or(1) >= 1) {
-        resProps.minTrans = std::max(resProps.minTrans, 1U);
-      } else {
-        mergeLikeOp->emitWarning()
-            << "Cannot place transparent buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may "
-               "yield an invalid buffering.";
+    if (algorithm == ON_MERGES) {
+      // Make sure that the data output channels of all merge-like operations
+      // have at least one opaque and one transparent slot, unless a constraint
+      // explicitly prevents us from putting a buffer there
+      for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
+        ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
+        if (resProps.maxTrans.value_or(1) >= 1) {
+          resProps.minTrans = std::max(resProps.minTrans, 1U);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place transparent buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+        if (resProps.maxOpaque.value_or(1) >= 1) {
+          resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place opaque buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
       }
-      if (resProps.maxOpaque.value_or(1) >= 1) {
-        resProps.minOpaque = std::max(resProps.minOpaque, 1U);
-      } else {
-        mergeLikeOp->emitWarning()
-            << "Cannot place opaque buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may "
-               "yield an invalid buffering.";
-      }
+    }
+    if (algorithm == CUT_LOOPBACKS) {
+
+      std::vector<Operation *> backedges;
+
+      funcOp.walk([&](mlir::Operation *op) {
+        op->emitRemark() << "My remark message";
+        for (Value result : op->getResults()) {
+          for (Operation *user : result.getUsers()) {
+            if (isBackedge(result, user)) {
+              op->emitRemark() << "Backedge found";
+              backedges.push_back(op);
+              ChannelBufProps &resProps = channelProps[op->getResult(0)];
+              if (resProps.maxTrans.value_or(1) >= 1) {
+                resProps.minTrans = std::max(resProps.minTrans, 1U);
+              }
+              if (resProps.maxOpaque.value_or(1) >= 1) {
+                resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+              }
+              break; // Move to the next operation after finding a
+                     // backedge
+            }
+          }
+        }
+      });
     }
 
     // Place the minimal number of buffers (as specified by the buffering

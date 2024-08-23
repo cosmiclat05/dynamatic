@@ -1,0 +1,13 @@
+#-----------------------------------------------------------
+# Vivado v2019.1.1 (64-bit)
+# SW Build 2580384 on Sat Jun 29 08:04:45 MDT 2019
+# IP Build 2579722 on Sat Jun 29 11:35:40 MDT 2019
+# Start of session at: Tue Aug 13 16:08:50 2024
+# Process ID: 106097
+# Current directory: /home/oyasar/dynamatic
+# Command line: vivado -mode tcl
+# Log file: /home/oyasar/dynamatic/vivado.log
+# Journal file: /home/oyasar/dynamatic/vivado.jou
+#-----------------------------------------------------------
+exit
+INFO: [Common 17-206] Exiting Vivado at Tue Aug 13 16:10:44 2024...

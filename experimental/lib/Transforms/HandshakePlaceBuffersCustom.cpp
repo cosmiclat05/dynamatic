@@ -21,13 +21,13 @@
 // supply the producer--consumer pair as arguments
 //===----------------------------------------------------------------------===//
 
+#include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
-#include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "llvm/ADT/StringRef.h"
 
