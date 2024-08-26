@@ -1200,7 +1200,7 @@ static StringRef getNodeColor(Operation *op) {
   return llvm::TypeSwitch<Operation *, StringRef>(op)
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
-      .Case<handshake::BufferOpInterface>([&](auto) { return "tan2"; })
+      .Case<handshake::BufferOpInterface>([&](auto) { return "blue"; })
       .Case<handshake::ReturnOp, handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })
