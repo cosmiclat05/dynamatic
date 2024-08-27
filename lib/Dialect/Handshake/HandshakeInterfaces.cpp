@@ -16,6 +16,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
@@ -82,8 +83,28 @@ std::string handshake::SelectOp::getResultName(unsigned idx) {
 }
 
 /// Load/Store base signal names common to all memory interfaces
-static constexpr llvm::StringLiteral MEMREF("memref"), CTRL("ctrl"),
-    LD_ADDR("ldAddr"), LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");
+static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
+    MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
+    LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");
+
+static StringRef getIfControlOprd(MemoryOpInterface memOp, unsigned idx) {
+  if (!memOp.isMasterInterface())
+    return "";
+  switch (idx) {
+  case 0:
+    return MEMREF;
+  case 1:
+    return MEM_START;
+  default:
+    return idx == memOp->getNumOperands() - 1 ? CTRL_END : "";
+  }
+}
+
+static StringRef getIfControlRes(MemoryOpInterface memOp, unsigned idx) {
+  if (memOp.isMasterInterface() && idx == memOp->getNumResults() - 1)
+    return MEM_END;
+  return "";
+}
 
 /// Common operand naming logic for memory controllers and LSQs.
 static std::string getMemOperandName(const FuncMemoryPorts &ports,
@@ -116,11 +137,7 @@ static std::string getMemOperandName(const FuncMemoryPorts &ports,
 }
 
 /// Common result naming logic for memory controllers and LSQs.
-static std::string getMemResultName(const FuncMemoryPorts &ports,
-                                    unsigned idx) {
-  if (idx == ports.memOp->getNumResults() - 1)
-    return "memDone";
-
+static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
   // Iterate through all memory ports to find out the type of the
   // operand
   unsigned loadIdx = 0;
@@ -139,8 +156,8 @@ static std::string getMemResultName(const FuncMemoryPorts &ports,
 std::string handshake::MemoryControllerOp::getOperandName(unsigned idx) {
   assert(idx < getNumOperands() && "index too high");
 
-  if (idx == 0)
-    return MEMREF.str();
+  if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
+    return name.str();
 
   // Try to get the operand name from the regular ports
   MCPorts mcPorts = getPorts();
@@ -161,6 +178,9 @@ std::string handshake::MemoryControllerOp::getOperandName(unsigned idx) {
 std::string handshake::MemoryControllerOp::getResultName(unsigned idx) {
   assert(idx < getNumResults() && "index too high");
 
+  if (StringRef name = getIfControlRes(*this, idx); !name.empty())
+    return name.str();
+
   // Try to get the operand name from the regular ports
   MCPorts mcPorts = getPorts();
   if (std::string name = getMemResultName(mcPorts, idx); !name.empty())
@@ -176,9 +196,8 @@ std::string handshake::MemoryControllerOp::getResultName(unsigned idx) {
 std::string handshake::LSQOp::getOperandName(unsigned idx) {
   assert(idx < getNumOperands() && "index too high");
 
-  bool connectsToMC = isConnectedToMC();
-  if (idx == 0 && !connectsToMC)
-    return MEMREF.str();
+  if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
+    return name.str();
 
   // Try to get the operand name from the regular ports
   LSQPorts lsqPorts = getPorts();
@@ -195,6 +214,9 @@ std::string handshake::LSQOp::getOperandName(unsigned idx) {
 std::string handshake::LSQOp::getResultName(unsigned idx) {
   assert(idx < getNumResults() && "index too high");
 
+  if (StringRef name = getIfControlRes(*this, idx); !name.empty())
+    return name.str();
+
   // Try to get the operand name from the regular ports
   LSQPorts lsqPorts = getPorts();
   if (std::string name = getMemResultName(lsqPorts, idx); !name.empty())
@@ -209,6 +231,38 @@ std::string handshake::LSQOp::getResultName(unsigned idx) {
     return "stAddrToMC";
   assert(mcPort.getStoreDataOutputIndex() == idx && "unknown LSQ/MC result");
   return "stDataToMC";
+}
+
+//===----------------------------------------------------------------------===//
+// MemoryOpInterface
+//===----------------------------------------------------------------------===//
+
+bool MemoryControllerOp::isMasterInterface() { return true; }
+
+bool LSQOp::isMasterInterface() { return !isConnectedToMC(); }
+
+TypedValue<MemRefType> LSQOp::getMemRef() {
+  if (handshake::MemoryControllerOp mcOp = getConnectedMC())
+    return mcOp.getMemRef();
+  return cast<TypedValue<MemRefType>>(getInputs().front());
+}
+
+TypedValue<ControlType> LSQOp::getMemStart() {
+  if (MemoryControllerOp mcOp = getConnectedMC())
+    return mcOp.getMemStart();
+  return cast<TypedValue<ControlType>>(getOperand(1));
+}
+
+TypedValue<ControlType> LSQOp::getMemEnd() {
+  if (MemoryControllerOp mcOp = getConnectedMC())
+    return mcOp.getMemStart();
+  return cast<TypedValue<ControlType>>(getResults().back());
+}
+
+TypedValue<ControlType> LSQOp::getCtrlEnd() {
+  if (MemoryControllerOp mcOp = getConnectedMC())
+    return mcOp.getCtrlEnd();
+  return cast<TypedValue<ControlType>>(getOperands().back());
 }
 
 //===----------------------------------------------------------------------===//

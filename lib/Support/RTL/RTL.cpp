@@ -13,6 +13,7 @@
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/JSON/JSON.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Diagnostics.h"
@@ -63,6 +64,14 @@ static const mlir::DenseSet<StringRef> RESERVED_PARAMETER_NAMES{
     RTLParameter::DYNAMATIC, RTLParameter::OUTPUT_DIR,
     RTLParameter::MODULE_NAME};
 
+StringRef dynamatic::getHDLExtension(HDL hdl) {
+  switch (hdl) {
+  case HDL::VHDL:
+    return "vhd";
+  case HDL::VERILOG:
+    return "v";
+  }
+}
 std::string dynamatic::replaceRegexes(
     StringRef input, const std::map<std::string, std::string> &replacements) {
   std::string result(input);
@@ -81,8 +90,8 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(
-          op->getAttrOfType<DictionaryAttr>(RTLRequest::PARAMETERS_ATTR)) {};
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
+      };
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -103,9 +112,9 @@ LogicalResult
 RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
                                           ParameterMappings &mappings) const {
   LLVM_DEBUG(llvm::dbgs() << "Attempting match with RTL component "
-                          << component.getName() << "\n\t-> ";);
+                          << component.getName() << "\n";);
   if (name != component.getName()) {
-    LLVM_DEBUG(llvm::dbgs() << "Names do not match.\n");
+    LLVM_DEBUG(llvm::dbgs() << "\t-> Names do not match.\n");
     return failure();
   }
 
@@ -122,18 +131,19 @@ RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
     LLVM_DEBUG({
       switch (paramMatch.state) {
       case ParamMatch::State::DOES_NOT_EXIST:
-        llvm::dbgs() << "Parameter \"" << paramName << "\" does not exist\n";
+        llvm::dbgs() << "\t-> Parameter \"" << paramName
+                     << "\" does not exist\n";
         break;
       case ParamMatch::State::FAILED_VERIFICATION:
-        llvm::dbgs() << "Failed constraint checking for parameter \""
+        llvm::dbgs() << "\t-> Failed constraint checking for parameter \""
                      << paramName << "\"\n";
         break;
       case ParamMatch::State::FAILED_SERIALIZATION:
-        llvm::dbgs() << "Failed serialization for parameter \"" << paramName
-                     << "\"\n";
+        llvm::dbgs() << "\t-> Failed serialization for parameter \""
+                     << paramName << "\"\n";
         break;
       case ParamMatch::State::SUCCESS:
-        llvm::dbgs() << "Matched parameter \"" << paramName << "\"\n";
+        llvm::dbgs() << "\t-> Matched parameter \"" << paramName << "\"\n";
         break;
       }
     });
@@ -141,7 +151,7 @@ RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
       return failure();
     mappings[paramName] = paramMatch.serialized;
   }
-  LLVM_DEBUG(llvm::dbgs() << "Matched!\n");
+  LLVM_DEBUG(llvm::dbgs() << "\t-> Matched!\n");
   return success();
 }
 
@@ -179,8 +189,7 @@ RTLRequestFromHWModule::tryToMatch(const RTLComponent &component) const {
 }
 
 std::string RTLRequestFromHWModule::getName(hw::HWModuleExternOp modOp) {
-  if (StringAttr nameAttr =
-          modOp->getAttrOfType<StringAttr>(RTLRequest::NAME_ATTR))
+  if (auto nameAttr = modOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME))
     return nameAttr.str();
   return "";
 }
@@ -240,9 +249,10 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
 
   if (component->isGeneric()) {
     std::string inputFile = substituteParams(component->generic, allParams);
+    HDL hdl = component->hdl;
     std::string outputFile = outputDir.str() +
                              sys::path::get_separator().str() + moduleName +
-                             ".vhd";
+                             "." + getHDLExtension(hdl).str();
 
     // Just copy the file to the output location
     if (auto ec = sys::fs::copy_file(inputFile, outputFile); ec.value() != 0) {

@@ -2,6 +2,7 @@
   "version": "0.2.0",
   "configurations": [
       {
+<<<<<<< HEAD
           "name": "Debug Pass",
           "type": "cppdbg",
           "request": "launch",
@@ -18,6 +19,11 @@
           "externalConsole": false,
           "MIMode": "gdb",
           "miDebuggerPath": "/usr/bin/gdb", // Path to gdb
+=======
+          "type": "cppdbg",
+          "request": "launch",
+          "name": "Launch Program",
+>>>>>>> upstream/main
           "setupCommands": [
               {
                   "description": "Enable pretty-printing for gdb",
@@ -25,6 +31,7 @@
                   "ignoreFailures": true
               }
           ],
+<<<<<<< HEAD
           "preLaunchTask": "",
           "postDebugTask": "",
           "logging": {
@@ -33,6 +40,11 @@
               "engineLogging": false,
               "trace": false
           }
+=======
+          "args": ["--run", "tools/dynamatic/samples/fir.dyn"],
+          "cwd": "<current work directory>",
+          "program": "<dynamatic binary (dynamatic or dynamatic-opt or ...)>",
+>>>>>>> upstream/main
       }
   ]
 }
