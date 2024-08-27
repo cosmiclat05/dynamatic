@@ -117,8 +117,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
       allAlgorithms;
   allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
-  allAlgorithms[CUT_LOOPBACKS] =
-      &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
+  allAlgorithms[CUT_LOOPBACKS] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPGA20_LEGACY] = &HandshakePlaceBuffersPass::placeUsingMILP;
