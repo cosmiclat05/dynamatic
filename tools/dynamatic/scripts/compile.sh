@@ -143,6 +143,19 @@ elif [[ $CUT_LOOPBACKS -ne 0 ]]; then
     --handshake-cut-place-buffers="algorithm=cut-loopbacks timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to cut loopbacks" "Cut loopbacks"
+
+elif [[ $MAPBUF -ne 0 ]]; then
+
+    # Smart buffer placement
+  echo_info "Running smart buffer placement with CP = $TARGET_CP"
+  cd "$COMP_DIR"
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --handshake-set-buffering-properties="version=fpga20" \
+    --handshake-place-buffers="algorithm=mapbuf frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" cuts=$DYNAMATIC_DIR/data/cuts \
+    > "$F_HANDSHAKE_BUFFERED"
+  exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
+  cd - > /dev/null
+
 else
   # Compile kernel's main function to extract profiling information
   "$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D PRINT_PROFILING_INFO -I \

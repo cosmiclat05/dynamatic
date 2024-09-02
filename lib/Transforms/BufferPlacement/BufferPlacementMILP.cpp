@@ -126,6 +126,7 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   for (SignalType sig : signals) {
     ChannelSignalVars &signalVars = channelVars.signalVars[sig];
     StringRef name = getSignalName(sig);
+
     signalVars.path.tIn = createVar(name + "PathIn", GRB_CONTINUOUS);
     signalVars.path.tOut = createVar(name + "PathOut", GRB_CONTINUOUS);
     signalVars.bufPresent = createVar(name + "BufPresent", GRB_BINARY);

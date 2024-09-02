@@ -521,6 +521,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
         }
       }
     }
+    
     if (algorithm == CUT_LOOPBACKS) {
       // Make sure that all the loops are cut by placing at least one buffer
       funcOp.walk([&](mlir::Operation *op) {

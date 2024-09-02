@@ -2,6 +2,7 @@ add_dynamatic_library(DynamaticExperimentalSupport
   CDGAnalysis.cpp
   StdProfiler.cpp
   HandshakeSimulator.cpp
+  CutEnumeration.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR

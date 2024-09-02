@@ -2,7 +2,6 @@
   "version": "0.2.0",
   "configurations": [
       {
-<<<<<<< HEAD
           "name": "Debug Pass",
           "type": "cppdbg",
           "request": "launch",
@@ -10,20 +9,15 @@
           "args": [
               "/home/oyasar/dynamatic/integration-test/fir/out/comp/handshake_transformed.mlir",
               "--handshake-set-buffering-properties=version=fpga20",
-              "--handshake-place-buffers=algorithm=cut-loopbacks timing-models=/home/oyasar/dynamatic/data/components.json" 
-              //"--handshake-place-buffers=algorithm=fpl22 frequencies=/home/oyasar/dynamatic/integration-test/fir/out/comp/frequencies.csv timing-models=/home/oyasar/dynamatic/data/components.json target-period=6.0 timeout=300 dump-logs"
+              //"--handshake-place-buffers=algorithm=cut-loopbacks timing-models=/home/oyasar/dynamatic/data/components.json" 
+              "--handshake-place-buffers=algorithm=fpga20 frequencies=/home/oyasar/dynamatic/integration-test/fir/out/comp/frequencies.csv timing-models=/home/oyasar/dynamatic/data/components.json target-period=6.0 timeout=300 dump-logs"
               ],
-          "stopAtEntry": false,
+          "stopAtEntry": true,
           "cwd": "/home/oyasar/dynamatic", // Set working directory
           "environment": [],
           "externalConsole": false,
           "MIMode": "gdb",
           "miDebuggerPath": "/usr/bin/gdb", // Path to gdb
-=======
-          "type": "cppdbg",
-          "request": "launch",
-          "name": "Launch Program",
->>>>>>> upstream/main
           "setupCommands": [
               {
                   "description": "Enable pretty-printing for gdb",
@@ -31,7 +25,6 @@
                   "ignoreFailures": true
               }
           ],
-<<<<<<< HEAD
           "preLaunchTask": "",
           "postDebugTask": "",
           "logging": {
@@ -40,11 +33,6 @@
               "engineLogging": false,
               "trace": false
           }
-=======
-          "args": ["--run", "tools/dynamatic/samples/fir.dyn"],
-          "cwd": "<current work directory>",
-          "program": "<dynamatic binary (dynamatic or dynamatic-opt or ...)>",
->>>>>>> upstream/main
       }
   ]
 }
