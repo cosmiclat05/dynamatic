@@ -23,10 +23,12 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Path.h"
 #include <string>
@@ -43,7 +45,7 @@ static constexpr llvm::StringLiteral CUT_LOOPBACKS("cut-loopbacks");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"),
-    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22");
+    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22"), MAPBUF("mapbuf");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace {
@@ -118,11 +120,13 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
       allAlgorithms;
   allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
-  allAlgorithms[CUT_LOOPBACKS] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
+  allAlgorithms[CUT_LOOPBACKS] =
+      &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPGA20_LEGACY] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
   // Check that the algorithm exists
@@ -472,6 +476,12 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
         logger, "out_of_cycle", placement, env, info, timingDB, targetCP);
   }
 
+  if (algorithm == MAPBUF) {
+    // Create and solve the MILP
+    return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
+        logger, "placement", placement, env, info, timingDB, targetCP);
+  }
+
   llvm_unreachable("unknown algorithm");
 }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -521,12 +531,15 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
         }
       }
     }
-    
+
     if (algorithm == CUT_LOOPBACKS) {
       // Make sure that all the loops are cut by placing at least one buffer
       funcOp.walk([&](mlir::Operation *op) {
         for (Value result : op->getResults()) {
+          op->emitRemark() << "Channel Name: "
+                           << getUniqueName(*result.getUses().begin()) << "\n";
           for (Operation *user : result.getUsers()) {
+
             if (isBackedge(result, user)) {
               ChannelBufProps &resProps = channelProps[op->getResult(0)];
               if (resProps.maxTrans.value_or(1) >= 1) {
@@ -534,18 +547,20 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
               } else {
                 op->emitWarning()
                     << "Cannot place opaque buffer on merge-like operation's "
-                      "output due to channel-specific buffering constraints. This "
-                      "may "
-                      "yield an invalid buffering.";
+                       "output due to channel-specific buffering constraints. "
+                       "This "
+                       "may "
+                       "yield an invalid buffering.";
               }
               if (resProps.maxOpaque.value_or(1) >= 1) {
                 resProps.minOpaque = std::max(resProps.minOpaque, 1U);
               } else {
                 op->emitWarning()
                     << "Cannot place opaque buffer on merge-like operation's "
-                      "output due to channel-specific buffering constraints. This "
-                      "may "
-                      "yield an invalid buffering.";
+                       "output due to channel-specific buffering constraints. "
+                       "This "
+                       "may "
+                       "yield an invalid buffering.";
               }
             }
           }

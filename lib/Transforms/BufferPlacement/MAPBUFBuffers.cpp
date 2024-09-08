@@ -28,7 +28,7 @@ using namespace dynamatic::buffer::mapbuf;
 
 MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
                              const TimingDatabase &timingDB,
-                             double targetPeriod, experimental::Cuts cuts)
+                             double targetPeriod)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod) {
   if (!unsatisfiable)
     setup();
@@ -36,8 +36,8 @@ MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
 
 MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
                              const TimingDatabase &timingDB,
-                             double targetPeriod, experimental::Cuts cuts,
-                             Logger &logger, StringRef milpName)
+                             double targetPeriod, Logger &logger,
+                             StringRef milpName)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
                           milpName) {
   if (!unsatisfiable)
@@ -46,7 +46,7 @@ MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
 
 void MAPBUFBuffers::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
-  for (auto &[channel, channelVars] : vars.channelVars) {
+  for (auto [channel, channelVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
     unsigned numSlotsToPlace = static_cast<unsigned>(
@@ -56,24 +56,23 @@ void MAPBUFBuffers::extractResult(BufferPlacement &placement) {
 
     bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
+    bool placeTransparent =
+        channelVars.signalVars[SignalType::READY].bufPresent.get(
+            GRB_DoubleAttr_X) > 0;
 
     handshake::ChannelBufProps &props = channelProps[channel];
-
     PlacementResult result;
-    if (placeOpaque) {
-      // We want as many slots as possible to be transparent and at least one
-      // opaque slot, while satisfying all buffering constraints
-      unsigned actualMinOpaque = std::max(1U, props.minOpaque);
-      if (props.maxTrans.has_value() &&
-          (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-        result.numTrans = props.maxTrans.value();
-        result.numOpaque = numSlotsToPlace - result.numTrans;
-      } else {
-        result.numOpaque = actualMinOpaque;
-        result.numTrans = numSlotsToPlace - result.numOpaque;
-      }
+    if (placeOpaque && placeTransparent) {
+      // Place at least one opaque slot and satisfy the opaque slot requirement,
+      // all other slots are transparent
+      result.numOpaque = std::max(props.minOpaque, 1U);
+      result.numTrans = numSlotsToPlace - result.numOpaque;
+    } else if (placeOpaque) {
+      // Satisfy the transparent slots requirement, all other slots are opaque
+      result.numTrans = props.minTrans;
+      result.numOpaque = numSlotsToPlace - props.minTrans;
     } else {
-      // All slots should be transparent
+      // All slots transparent
       result.numTrans = numSlotsToPlace;
     }
 
@@ -111,32 +110,66 @@ void MAPBUFBuffers::setup() {
   // Create channel variables and constraints
   std::vector<Value> allChannels;
 
+  experimental::Cuts cutfile;
+  cutfile.readFromFile("/home/oyasar/mapbuf_external/cuts.txt");
+
   for (auto &[channel, _] : channelProps) {
     allChannels.push_back(channel);
     ChannelVars &channelVars = vars.channelVars[channel];
     addChannelVars(channel, signals);
     for (auto signal : signals) {
       ChannelSignalVars &signalVars = channelVars.signalVars[signal];
+
       model.addConstr(signalVars.path.tOut <= targetPeriod, "path_period");
-      model.addConstr(signalVars.path.tIn <= targetPeriod,"path_bufferedChannelIn");
-      model.addConstr(signalVars.path.tOut - signalVars.path.tIn + targetPeriod * signalVars.bufPresent <= targetPeriod, "path_bufferedChannelIn");
+      model.addConstr(signalVars.path.tIn <= targetPeriod,
+                      "path_bufferedChannelIn");
+      model.addConstr(signalVars.path.tOut - signalVars.path.tIn +
+                              targetPeriod * signalVars.bufPresent >=
+                          targetPeriod,
+                      "path_bufferInteraction");
     }
   }
-      // Create the expression for the MILP objective
-  GRBLinExpr objective;
 
-  // For each channel, add a "penalty" in case a buffer is added to the channel,
-  // and another penalty that depends on the number of slots
-  double bufPenaltyMul = 1e-4;
-  double slotPenaltyMul = 1e-5;
-  for (Value channel : allChannels) {
-    ChannelVars &channelVars = vars.channelVars[channel];
-    objective -= bufPenaltyMul * channelVars.bufPresent;
-    objective -= slotPenaltyMul * channelVars.bufNumSlots;
+  for (auto const &[key, val] : cutfile.cuts) {
+    GRBLinExpr cutSelectionSum = 0;
+    int i = 0;
+    for (auto cut : val) {
+      cut.cutSelection = model.addVar(0, 1, 0, GRB_BINARY, (cut.node + "__CutSelection_" + std::to_string(i)));
+      cutSelectionSum += cut.cutSelection;
+      i++;
+
+      // Loop over other GRB variables to check if cut.node matches them
+      for (auto const &[channel, channelVars] : vars.channelVars) {
+        for (auto const &[signal, signalVars] : channelVars.signalVars) {
+          if (signalVars.path.tIn.get(GRB_StringAttr_VarName).find(cut.node) != std::string::npos) {
+          // Loop over the leafs of the cut
+            for (auto const& leaf : cut.leaves) {
+              for (auto const& [channel1, channelVars1] : vars.channelVars) {
+                for (auto const& [signal1, signalVars1] : channelVars1.signalVars) {
+                  if (signalVars1.path.tOut.get(GRB_StringAttr_VarName).find(leaf) != std::string::npos) {
+                    model.addConstr(10 * targetPeriod * (1 - cut.cutSelection) - signalVars.path.tIn >= signalVars1.path.tOut + 1, "delay_propagation");
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+    }
+    model.addConstr(cutSelectionSum == 1, "cut_selection_constraint");
   }
 
-  // Finally, set the MILP objective
-  model.setObjective(objective, GRB_MAXIMIZE);
+  SmallVector<CFDFC *> cfdfcs;
+  for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
+    if (!optimize)
+      continue;
+    cfdfcs.push_back(cfdfc);
+    addCFDFCVars(*cfdfc);
+    addChannelThroughputConstraints(*cfdfc);
+    addUnitThroughputConstraints(*cfdfc);
+  }
+  addObjective(allChannels, cfdfcs);
   markReadyToOptimize();
   /*
     for (auto &[channel, _] : channelProps) {

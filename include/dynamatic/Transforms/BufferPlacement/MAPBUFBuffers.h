@@ -52,13 +52,13 @@ public:
   /// the MILP will not be marked ready for optimization, ensuring that further
   /// calls to `optimize` fail.
   MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, experimental::Cuts cuts);
+                double targetPeriod);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
   MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, experimental::Cuts cuts, Logger &logger,
+                double targetPeriod, Logger &logger,
                 StringRef milpName = "placement");
 
 protected:

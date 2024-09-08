@@ -10,16 +10,7 @@ set-src             integration-test/fir/fir.c
 
 # Compile (from source to Handshake IR/DOT)
 # Remove the flag to run smart buffer placement (requires Gurobi)
-compile             --simple-buffers
-
-# Generate the VHDL for the dataflow circuit
-write-hdl
-
-# Simulate using Modelsim
-simulate
-
-# Synthesize using Vivado
-synthesize
+compile            
 
 # Exit the frontend
 exit

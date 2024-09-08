@@ -10,9 +10,9 @@
               "/home/oyasar/dynamatic/integration-test/fir/out/comp/handshake_transformed.mlir",
               "--handshake-set-buffering-properties=version=fpga20",
               //"--handshake-place-buffers=algorithm=cut-loopbacks timing-models=/home/oyasar/dynamatic/data/components.json" 
-              "--handshake-place-buffers=algorithm=fpga20 frequencies=/home/oyasar/dynamatic/integration-test/fir/out/comp/frequencies.csv timing-models=/home/oyasar/dynamatic/data/components.json target-period=6.0 timeout=300 dump-logs"
+              "--handshake-place-buffers=algorithm=mapbuf frequencies=/home/oyasar/dynamatic/integration-test/fir/out/comp/frequencies.csv timing-models=/home/oyasar/dynamatic/data/components.json target-period=6.0 timeout=300 dump-logs"
               ],
-          "stopAtEntry": true,
+          "stopAtEntry": false,
           "cwd": "/home/oyasar/dynamatic", // Set working directory
           "environment": [],
           "externalConsole": false,
