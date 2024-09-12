@@ -108,7 +108,7 @@ void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
       model.addConstr(chVars.bufNumSlots >= minTotalSlots,
                       "custom_minOpaqueAndTrans");
     } else {
-      // Force the MILP to place a minimum number of opaque slots
+      // Force trhe MILP to place a minimum number of opaque slots
       model.addConstr(chVars.bufNumSlots >= props.minOpaque,
                       "custom_minOpaque");
     }

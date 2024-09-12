@@ -36,6 +36,7 @@ F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
+F_HANDSHAKE_CUTLOOPBACKS="$COMP_DIR/handshake_cut_loopbacks.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
@@ -133,8 +134,32 @@ if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=cut-loopbacks timing-models=$DYNAMATIC_DIR/data/components.json" \
-    > "$F_HANDSHAKE_BUFFERED"
+    > "$F_HANDSHAKE_CUTLOOPBACKS"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
+
+    # Compile kernel's main function to extract profiling information
+  "$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D PRINT_PROFILING_INFO -I \
+    "$DYNAMATIC_DIR/include" -Wno-deprecated -o "$F_PROFILER_BIN"
+  exit_on_fail "Failed to build kernel for profiling" "Built kernel for profiling"
+
+  "$F_PROFILER_BIN" > "$F_PROFILER_INPUTS"
+  exit_on_fail "Failed to kernel for profiling" "Ran kernel for profiling"
+
+  # cf-level profiler
+  "$DYNAMATIC_PROFILER_BIN" "$F_CF_DYN_TRANSFORMED" \
+    --top-level-function="$KERNEL_NAME" --input-args-file="$F_PROFILER_INPUTS" \
+    > $F_FREQUENCIES
+  exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
+
+  # Smart buffer placement
+  echo_info "Running smart buffer placement with CP = $TARGET_CP"
+  cd "$COMP_DIR"
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_CUTLOOPBACKS" \
+    --handshake-set-buffering-properties="version=fpga20" \
+    --handshake-place-buffers="algorithm=mapbuf frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
+    > "$F_HANDSHAKE_BUFFERED"
+  exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
+  cd - > /dev/null
 
 elif [[ $CUT_LOOPBACKS -ne 0 ]]; then
   # Cut every loop by buffers
@@ -143,18 +168,6 @@ elif [[ $CUT_LOOPBACKS -ne 0 ]]; then
     --handshake-cut-place-buffers="algorithm=cut-loopbacks timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to cut loopbacks" "Cut loopbacks"
-
-elif [[ $MAPBUF -ne 0 ]]; then
-
-    # Smart buffer placement
-  echo_info "Running smart buffer placement with CP = $TARGET_CP"
-  cd "$COMP_DIR"
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=mapbuf frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
-    > "$F_HANDSHAKE_BUFFERED"
-  exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
-  cd - > /dev/null
 
 else
   # Compile kernel's main function to extract profiling information
@@ -176,7 +189,7 @@ else
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=mapbuf frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
+    --handshake-place-buffers="algorithm=fpga20 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

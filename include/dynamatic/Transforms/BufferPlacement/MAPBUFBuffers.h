@@ -76,6 +76,8 @@ private:
   /// annotations to the Gurobi model.
   void addMapbufConstraints(Value channel);
 
+  void addCustomChannelConstraints(Value channel);
+
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.

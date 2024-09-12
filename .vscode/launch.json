@@ -7,7 +7,7 @@
           "request": "launch",
           "program": "/home/oyasar/dynamatic/bin/dynamatic-opt", // Path to the binary
           "args": [
-              "/home/oyasar/dynamatic/integration-test/fir/out/comp/handshake_transformed.mlir",
+              "/home/oyasar/dynamatic/integration-test/fir/out/comp/handshake_cut_loopbacks.mlir",
               "--handshake-set-buffering-properties=version=fpga20",
               //"--handshake-place-buffers=algorithm=cut-loopbacks timing-models=/home/oyasar/dynamatic/data/components.json" 
               "--handshake-place-buffers=algorithm=mapbuf frequencies=/home/oyasar/dynamatic/integration-test/fir/out/comp/frequencies.csv timing-models=/home/oyasar/dynamatic/data/components.json target-period=6.0 timeout=300 dump-logs"
