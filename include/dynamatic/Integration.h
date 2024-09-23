@@ -190,6 +190,7 @@ static Res callKernel(Res (*kernel)(void)) {
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 
 /// Whenever HLS_VERIFICATION is defined, this macro must contain the path to
 /// the directory where the INPUT_VECTORS and C_OUT directories have been

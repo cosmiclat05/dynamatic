@@ -1,0 +1,43 @@
+Digraph G {
+  splines=spline;
+  compound=true; // Allow edges between clusters
+  // Function arguments
+  "idx" [mlir_op="handshake.func", shape=diamond, label="idx", style="solid"]
+  "start" [mlir_op="handshake.func", shape=diamond, label="start", style="dotted"]
+  // Function results
+  "out0" [mlir_op="handshake.func", shape=diamond, label="out0", style="solid"]
+  "end" [mlir_op="handshake.func", shape=diamond, label="end", style="dotted"]
+  // Units/Channels in BB 0
+  subgraph "cluster0" {
+    label="block0"
+    // Units in BB 0
+    "source0" [mlir_op="handshake.source", label="source", fillcolor=gainsboro, shape="box", style="filled"]
+    "constant1" [mlir_op="handshake.constant", label="1000", fillcolor=plum, shape="oval", style="filled"]
+    "extsi0" [mlir_op="handshake.extsi", label="[11...32]", fillcolor=moccasin, shape="oval", style="filled"]
+    "mux1" [mlir_op="handshake.mux", label="mux", fillcolor=lightblue, shape="box", style="filled"]
+    "addi0" [mlir_op="handshake.addi", label="+", fillcolor=moccasin, shape="oval", style="filled"]
+    "constant0" [mlir_op="handshake.constant", label="true", fillcolor=plum, shape="oval", style="filled"]
+    "cond_br3" [mlir_op="handshake.cond_br", label="cbranch", fillcolor=tan2, shape="box", style="filled"]
+    "buffer0" [mlir_op="handshake.buffer", label="oehb [1]", fillcolor=gold, shape="box", style="filled"]
+    "buffer1" [mlir_op="handshake.buffer", label="tehb [1]", fillcolor=gold, shape="box", style="filled"]
+    // Channels in BB 0
+    "source0" -> "constant0" [style="dotted", dir="both", arrowtail="none", arrowhead="normal", ]
+    "source0" -> "constant1" [style="dotted", dir="both", arrowtail="none", arrowhead="normal", ]
+    "constant1" -> "extsi0" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+    "extsi0" -> "mux1" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+    "mux1" -> "addi0" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+    "addi0" -> "cond_br3" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+    "constant0" -> "cond_br3" [style="solid", dir="both", arrowtail="none", arrowhead="dot", ]
+    "constant0" -> "mux1" [style="solid", dir="both", arrowtail="none", arrowhead="dot", ]
+    "cond_br3" -> "buffer0" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+    "buffer0" -> "buffer1" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+    "buffer1" -> "mux1" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+  }
+  // Units outside of all basic blocks
+  // Channels from function arguments
+  "idx" -> "addi0" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+  "start" -> "end0" [style="dotted", dir="both", arrowtail="none", arrowhead="normal", ]
+  // Channels outgoing of BB 0
+  "cond_br3" -> "out0" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+  // Channels outside of all basic blocks
+}

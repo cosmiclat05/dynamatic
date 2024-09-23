@@ -92,7 +92,7 @@ struct FrontendState {
   std::string dynamaticPath;
   std::string polygeistPath;
   // By default, the clock period is 4 ns
-  double targetCP = 4.0;
+  double targetCP = 10.0;
   std::optional<std::string> sourcePath = std::nullopt;
 
   FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};

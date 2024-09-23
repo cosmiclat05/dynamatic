@@ -41,18 +41,21 @@ private:
     std::set<std::string> nodes;
     std::set<std::string> m_latchInputs;
     std::set<std::string> m_latchOutputs;
-    std::map<std::string, std::string> m_latches;
+    std::unordered_map<std::string, std::string> m_latches;
     std::set<std::string> m_constZeroNodes;
     std::set<std::string> m_constOneNodes;
 
     std::vector<std::string> m_signals;
-    std::map<std::string, std::set<std::string>> m_nodeFanins;
-    std::map<std::string, std::set<std::string>> m_nodeFanouts;
-    std::map<std::string, std::string> m_nodeFunctions;
+    std::unordered_map<std::string, std::set<std::string>> m_nodeFanins;
+    std::unordered_map<std::string, std::set<std::string>> m_nodeFanouts;
+    std::unordered_map<std::string, std::string> m_nodeFunctions;
 
     std::vector<std::string> m_nodesTopologicalOrder;
 
-    std::map<std::string, std::set<std::string>> m_submodules;
+    std::unordered_map<std::string, std::set<std::string>> m_submodules;
+
+    std::set<std::string> m_primaryInputs;
+    std::set<std::string> m_primaryOutputs;
 
 public:
     BlifData() = default;
@@ -101,6 +104,11 @@ public:
         m_nodeFanins[node] = fanins;
     }
 
+    std::set<std::string>& getNodeFanins(const std::string& node){
+        return m_nodeFanins[node];
+    }
+
+
     void addNodeFanouts(const std::string& node, const std::set<std::string>& fanouts) {
         m_nodeFanouts[node] = fanouts;
     }
@@ -111,6 +119,14 @@ public:
 
     void addSubmodule(const std::string& submodule, const std::set<std::string>& signals) {
         m_submodules[submodule] = signals;
+    }
+
+    bool isPrimaryInput(const std::string& input) const {
+        return m_primaryInputs.count(input) > 0;
+    }
+
+    bool isPrimaryOutput(const std::string& output) const {
+        return m_primaryOutputs.count(output) > 0;
     }
 
     bool isInput(const std::string& input) const {
@@ -139,8 +155,25 @@ public:
 
     std::set<std::string> getPrimaryOutputs() const;
 
-    std::vector<std::string> getNodesInOrder() const;
+    std::set<std::string> getNodes() const;
 
+    std::set<std::string> getFanouts(const std::string& node) const{
+        if (m_nodeFanouts.count(node) > 0) {
+            return m_nodeFanouts.at(node);
+        } else {
+            return std::set<std::string>();
+        }
+    }
+
+    std::set<std::string> getFanins(const std::string& node) const{
+        if (m_nodeFanins.count(node) > 0) {
+            return m_nodeFanins.at(node);
+        } else {
+            return std::set<std::string>();
+        }
+    }
+
+    std::vector<std::string> findPath(const std::string& start, const std::string& end);
 };
 
 class BlifParser{ 

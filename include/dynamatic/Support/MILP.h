@@ -91,6 +91,27 @@ public:
       return failure();
     }
     state = State::OPTIMIZED;
+
+  // After solving the model
+  // for (int i = 0; i < model.get(GRB_IntAttr_NumConstrs); ++i) {
+  //     GRBConstr constr = model.getConstr(i);
+  //     double relax_amount = constr.get(GRB_DoubleAttr_Slack);  // Slack for relaxed constraints
+
+  //     if (relax_amount != 0) {  // This constraint was relaxed
+  //         std::cout << "Constraint: " << constr.get(GRB_StringAttr_ConstrName) << "\n";
+  //         std::cout << "Relaxed by: " << relax_amount << "\n";
+
+  //         // Print the actual constraint (variables and coefficients)
+  //         GRBLinExpr expr = model.getRow(constr);  // Get the constraint's linear expression
+  //         for (int j = 0; j < expr.size(); ++j) {
+  //             GRBVar var = expr.getVar(j);
+  //             double coeff = expr.getCoeff(j);
+  //             std::cout << coeff << " * " << var.get(GRB_StringAttr_VarName) << " + ";
+  //         }
+  //         std::cout << " <= " << constr.get(GRB_DoubleAttr_RHS) << std::endl;  // Constraint RHS
+  //     }
+  // }
+  
     return success();
   }
 
