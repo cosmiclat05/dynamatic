@@ -21,6 +21,7 @@ CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
+PYTHON_SCRIPT_MAPBUF="/home/oyasar/mapbuf_external/dist/Verilog/Verilog"
 
 # Generated directories/files
 COMP_DIR="$OUTPUT_DIR/comp"
@@ -39,6 +40,7 @@ F_HANDSHAKE_CUTLOOPBACKS="$COMP_DIR/handshake_cut_loopbacks.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
+
 
 # ============================================================================ #
 # Helper funtions
@@ -105,10 +107,18 @@ exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 exit_on_fail "Failed to apply standard transformations to cf" \
   "Applied standard transformations to cf"
 
+# # cf transformations (dynamatic)
+# "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
+#   --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
+#   --mark-memory-interfaces \
+#   > "$F_CF_DYN_TRANSFORMED"
+# exit_on_fail "Failed to apply Dynamatic transformations to cf" \
+#   "Applied Dynamatic transformations to cf"
+
 # cf transformations (dynamatic)
 "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
   --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
-  --mark-memory-interfaces \
+  --force-memory-interface="force-mc" \
   > "$F_CF_DYN_TRANSFORMED"
 exit_on_fail "Failed to apply Dynamatic transformations to cf" \
   "Applied Dynamatic transformations to cf"
@@ -133,32 +143,8 @@ if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=cut-loopbacks timing-models=$DYNAMATIC_DIR/data/components.json" \
-    > "$F_HANDSHAKE_CUTLOOPBACKS"
-  exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
-
-    # Compile kernel's main function to extract profiling information
-  "$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D PRINT_PROFILING_INFO -I \
-    "$DYNAMATIC_DIR/include" -Wno-deprecated -o "$F_PROFILER_BIN"
-  exit_on_fail "Failed to build kernel for profiling" "Built kernel for profiling"
-
-  "$F_PROFILER_BIN" > "$F_PROFILER_INPUTS"
-  exit_on_fail "Failed to kernel for profiling" "Ran kernel for profiling"
-
-  # cf-level profiler
-  "$DYNAMATIC_PROFILER_BIN" "$F_CF_DYN_TRANSFORMED" \
-    --top-level-function="$KERNEL_NAME" --input-args-file="$F_PROFILER_INPUTS" \
-    > $F_FREQUENCIES
-  exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
-
-  # Smart buffer placement
-  echo_info "Running smart buffer placement with CP = $TARGET_CP"
-  cd "$COMP_DIR"
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_CUTLOOPBACKS" \
-    --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=mapbuf frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=15 timeout=1200 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
-  exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
-  cd - > /dev/null
+  exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 
 else
   # Compile kernel's main function to extract profiling information
@@ -175,12 +161,14 @@ else
     > $F_FREQUENCIES
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 
+  "$PYTHON_SCRIPT_MAPBUF" "$KERNEL_NAME" "$OUTPUT_DIR"
+
   # Smart buffer placement
   echo_info "Running smart buffer placement with CP = $TARGET_CP"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=fpga20 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=15 timeout=300 dump-logs" \
+    --handshake-place-buffers="algorithm=mapbuf frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=120 dump-logs blif-file=$OUTPUT_DIR/mapbuf/" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

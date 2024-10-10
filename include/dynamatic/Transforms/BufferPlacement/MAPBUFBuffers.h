@@ -24,6 +24,7 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "experimental/Support/CutEnumeration.h"
+#include "llvm/ADT/StringRef.h"
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -52,13 +53,13 @@ public:
   /// the MILP will not be marked ready for optimization, ensuring that further
   /// calls to `optimize` fail.
   MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod);
+                double targetPeriod, StringRef blifFile);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
   MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, Logger &logger,
+                double targetPeriod, StringRef blifFile, Logger &logger,
                 StringRef milpName = "placement");
 
 protected:
@@ -72,11 +73,22 @@ protected:
   void extractResult(BufferPlacement &placement) override;
 
 private:
+
+  StringRef blifFile;
+
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
   void addMapbufConstraints(Value channel);
 
   void addCustomChannelConstraints(Value channel);
+
+  void addCutSelectionConstraints();
+
+  void addCutLoopbackBuffers();
+
+  void addBlackboxConstraints();
+
+  void addClockPeriodConstraints(experimental::BlifData &blif, std::unordered_map<std::string, GRBVar> &nodeToGRB);
 
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior

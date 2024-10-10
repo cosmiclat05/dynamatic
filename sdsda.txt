@@ -1,0 +1,263 @@
+OVERVIEW: Dynamatic modular optimizer driver
+Available Dialects: affine, arith, builtin, cf, func, handshake, hw, llvm, math, memref, scf
+USAGE: dynamatic-opt [options] <input file>
+
+OPTIONS:
+
+Color Options:
+
+  --color                                              - Use colors in output (default=autodetect)
+
+General options:
+
+  --allow-unregistered-dialect                         - Allow operation with no registered dialects
+  Compiler passes to run
+    Passes:
+      --affine-data-copy-generate                      -   Generate explicit copying for affine memory operations
+        --fast-mem-capacity=<ulong>                    - Set fast memory space capacity in KiB (default: unlimited)
+        --fast-mem-space=<uint>                        - Fast memory space identifier for copy generation (default: 1)
+        --generate-dma                                 - Generate DMA instead of point-wise copy
+        --min-dma-transfer=<int>                       - Minimum DMA transfer size supported by the target in bytes
+        --skip-non-unit-stride-loops                   - Testing purposes: avoid non-unit stride loop choice depths for copy placement
+        --slow-mem-space=<uint>                        - Slow memory space identifier for copy generation (default: 0)
+        --tag-mem-space=<uint>                         - Tag memory space identifier for copy generation (default: 0)
+      --affine-expand-index-ops                        -   Lower affine operations operating on indices into more fundamental operations
+      --affine-loop-coalescing                         -   Coalesce nested loops with independent bounds into a single loop
+      --affine-loop-fusion                             -   Fuse affine loop nests
+        --fusion-compute-tolerance=<number>            - Fractional increase in additional computation tolerated while fusing
+        --fusion-fast-mem-space=<uint>                 - Faster memory space number to promote fusion buffers to
+        --fusion-local-buf-threshold=<ulong>           - Threshold size (KiB) for promoting local buffers to fast memory space
+        --fusion-maximal                               - Enables maximal loop fusion
+        --mode=<value>                                 - fusion mode to attempt
+    =greedy                                      -   Perform greedy (both producer-consumer and sibling)  fusion
+    =producer                                    -   Perform only producer-consumer fusion
+    =sibling                                     -   Perform only sibling fusion
+      --affine-loop-invariant-code-motion              -   Hoist loop invariant instructions outside of affine loops
+      --affine-loop-normalize                          -   Apply normalization transformations to affine loop-like ops
+        --promote-single-iter                          - Promote single iteration loops
+      --affine-loop-tile                               -   Tile affine loop nests
+        --cache-size=<ulong>                           - Set size of cache to tile for in KiB (default: 512)
+        --separate                                     - Separate full and partial tiles (default: false)
+        --tile-size=<uint>                             - Use this tile size for all loops
+        --tile-sizes=<uint>                            - List of tile sizes for each perfect nest (overridden by -tile-size)
+      --affine-loop-unroll                             -   Unroll affine loops
+        --cleanup-unroll                               - Fully unroll the cleanup loop when possible.
+        --unroll-factor=<uint>                         - Use this unroll factor for all loops being unrolled
+        --unroll-full                                  - Fully unroll loops
+        --unroll-full-threshold=<uint>                 - Unroll all loops with trip count less than or equal to this
+        --unroll-num-reps=<uint>                       - Unroll innermost loops repeatedly this many times
+        --unroll-up-to-factor                          - Allow unrolling up to the factor specified
+      --affine-loop-unroll-jam                         -   Unroll and jam affine loops
+        --unroll-jam-factor=<uint>                     - Use this unroll jam factor for all loops (default 4)
+      --affine-parallelize                             -   Convert affine.for ops into 1-D affine.parallel
+        --max-nested=<uint>                            - Maximum number of nested parallel loops to produce. Defaults to unlimited (UINT_MAX).
+        --parallel-reductions                          - Whether to parallelize reduction loops. Defaults to false.
+      --affine-pipeline-data-transfer                  -   Pipeline non-blocking data transfers between explicitly managed levels of the memory hierarchy
+      --affine-scalrep                                 -   Replace affine memref accesses by scalars by forwarding stores to loads and eliminating redundant loads
+      --affine-simplify-structures                     -   Simplify affine expressions in maps/sets and normalize memrefs
+      --affine-super-vectorize                         -   Vectorize to a target independent n-D vector abstraction
+        --test-fastest-varying=<long>                  - Specify a 1-D, 2-D or 3-D pattern of fastest varying memory dimensions to match. See defaultPatterns in Vectorize.cpp for a description and examples. This is used for testing purposes
+        --vectorize-reductions                         - Vectorize known reductions expressed via iter_args. Switched off by default.
+        --virtual-vector-size=<long>                   - Specify an n-D virtual vector size for vectorization
+      --arith-bufferize                                -   Bufferize Arith dialect ops.
+        --alignment=<uint>                             - Create global memrefs with a specified alignment
+      --arith-emulate-unsupported-floats               -   Emulate operations on unsupported floats with extf/truncf
+        --source-types=<string>                        - MLIR types without arithmetic support on a given target
+        --target-type=<string>                         - MLIR type to convert the unsupported source types to
+      --arith-emulate-wide-int                         -   Emulate 2*N-bit integer operations using N-bit operations
+        --widest-int-supported=<uint>                  - Widest integer type supported by the target
+      --arith-expand                                   -   Legalize Arith ops to be convertible to LLVM.
+        --include-bf16                                 - Enable the BF16 expansion patterns
+      --arith-int-narrowing                            -   Reduce integer operation bitwidth
+        --int-bitwidths-supported=<uint>               - Integer bitwidths supported
+      --arith-reduce-strength                          -   Strength reduction of arithmetic operations
+        --max-adder-depth-mul=<uint>                   - The maximum number of adders that can be chained one after the other when replacing a multiplication with a tree of adders. Above this number, we consider that there would be no desirable performance/area advantage to replace the multiplication.
+      --arith-unsigned-when-equivalent                 -   Replace signed ops with unsigned ones where they are proven equivalent
+      --back-annotate                                  -   Back-annotates IR from JSON-formatted attributes
+        --filepath=<string>                            - Path to JSON-formatted back-annotation file
+      --canonicalize                                   -   Canonicalize operations
+        --disable-patterns=<string>                    - Labels of patterns that should be filtered out during application
+        --enable-patterns=<string>                     - Labels of patterns that should be used during application, all other patterns are filtered out
+        --max-iterations=<long>                        - Max. iterations between applying patterns / simplifying regions
+        --max-num-rewrites=<long>                      - Max. number of pattern rewrites within an iteration
+        --region-simplify                              - Perform control flow optimizations to the region tree
+        --test-convergence                             - Test only: Fail pass on non-convergence to detect cyclic pattern
+        --top-down                                     - Seed the worklist in general top-down order
+      --control-flow-sink                              -   Sink operations into conditional blocks
+      --credit-based-sharing                           -   Credit-Based Sharing of Functional Units
+        --algorithm=<string>                           - Algorithm to use for buffer placement. Choices are: 'fpga20' (default), 'fpga20-legacy' (same as fpga-20 but interprets the MILP's results as legacy Dynamatic would, placing at most a single buffer type on any given channel)
+        --dump-logs                                    - If true, dump debugging information (identified CFDFCs, MILP placement decisions, solution summaries) into a directory named 'buffer-placement' at the binary's location.
+        --first-cfdfc                                  - If true, only extract the first CFDFC from the input file
+        --frequencies=<string>                         - Path to CSV-formatted file containing estimated transition frequencies between basic blocks in the kernel.
+        --target-period=<number>                       - Target clock period for the buffer placement CFDFC
+        --timeout=<uint>                               - Timeout (in seconds) for the buffer placement MILP (0 for no timeout)
+        --timing-models=<string>                       - Path to JSON-formatted file containing timing models for dataflow components.
+      --cse                                            -   Eliminate common sub-expressions
+      --duplicate-function-elimination                 -   Deduplicate functions
+      --exp-test-cdg-analysis                          -   Test CDG analysis utilities
+      --exp-test-handshake-simulator                   -   Test the Handshake simulator
+      --expand-realloc                                 -   Expand memref.realloc operations into its components
+        --emit-deallocs                                - Emit deallocation operations for the original MemRef
+      --expand-strided-metadata                        -   Expand memref operations into easier to analyze constructs
+      --flatten-memref-row-major                       -   Flatten memrefs (row-major order)
+      --fold-memref-alias-ops                          -   Fold memref alias ops into consumer load/store ops
+      --force-memory-interface                         -   Forces the use of a single type of memory interface
+        --force-lsq                                    - Whether to force the placement of LSQs in the circuit after Handshake lowering (off by default, mutually exclusice with force-mc).
+        --force-mc                                     - Whether to force the placement of MCs in the circuit after Handshake lowering (off by default, mutually exclusice with force-lsq).
+      --func-bufferize                                 -   Bufferize func/call/return ops
+      --func-maximize-ssa                              -   Converts the function's body into maximal SSA form.
+      --func-set-arg-names                             -   Replace function argument names with original ones from C
+        --source=<string>                              - Path to source C file from which the IR was generated.
+      --generate-runtime-verification                  -   Generate additional runtime op verification checks
+      --handshake-canonicalize                         -   Canonicalize Handshake operations.
+      --handshake-hoist-ext-instances                  -   Hoist external function instances into top-level IO.
+      --handshake-infer-basic-blocks                   -   Try to infer the basic block of untagged operations.
+      --handshake-materialize                          -   Materializes forks and sinks into the IR.
+      --handshake-minimize-cst-width                   -   Minimizes the bitwidth of all Handshake constants.
+        --opt-negatives                                - If true, allows bitwidth optimization of negative values.
+      --handshake-minimize-lsq-usage                   -   Minimizes the number of memory ports that go to LSQs.
+      --handshake-optimize-bitwidths                   -   Optimize bitwidths of all channels.
+        --legacy                                       - When legacy mode is enabled, disables bitwidth optimization of memory address channels since they sometime make the legacy dot2vhdl tool fail.
+      --handshake-place-buffers                        -   Places buffers in dataflow circuits for correctness and performance.
+        --algorithm=<string>                           - Algorithm to use for buffer placement. Choices are: 'on-merges' (default, does not require Gurobi), 'cut-loopbacks' 'fpga20', 'fpga20-legacy' (same as fpga-20 but interprets the MILP's results as legacy Dynamatic would, placing at most a single buffer type on any given channel), 'fpl22', 'mapbuf'.
+        --blif-file=<string>                           - Path to blif for MAPBUF.
+        --dump-logs                                    - If true, dump debugging information (identified CFDFCs, MILP placement decisions, solution summaries) into a directory named 'buffer-placement' at the binary's location.
+        --first-cfdfc                                  - If true, only extract the first CFDFC from the input file
+        --frequencies=<string>                         - Path to CSV-formatted file containing estimated transition frequencies between basic blocks in the kernel.
+        --target-period=<number>                       - Target clock period for the buffer placement CFDFC
+        --timeout=<uint>                               - Timeout (in seconds) for the buffer placement MILP (0 for no timeout)
+        --timing-models=<string>                       - Path to JSON-formatted file containing timing models for dataflow components.
+      --handshake-placebuffers-custom                  -   Place buffers on specific channels
+        --outid=<uint>                                 - output id of the predecessor, range: from 0 to number of outputs - 1
+        --pred=<string>                                - the predecessor unit of the channel
+        --slots=<uint>                                 - num of slots of buffer, range: anything > 0
+        --type=<string>                                - type of buffer, can be either oehb or tehb
+      --handshake-prepare-for-legacy                   -   Prepare the IR for usage in legacy Dynamatic.
+      --handshake-reshape-channels                     -   Reshape channels to simplify RTL generation.
+      --handshake-set-buffering-properties             -   Attach buffering properties to specifc channels in the IR
+        --version=<string>                             - Set of buffering properties to apply. Options are: fpga20 (default).
+      --handshake-speculation                          -   Place Speculation operations
+        --automatic                                    - When the automatic mode is enabled, the speculative unit positions are automatically detected. The speculator position still needs to be specified in the JSON-formatted file.
+        --json-path=<string>                           - Path to JSON-formatted file containing the positions for speculative operations.
+      --inline                                         -   Inline function calls
+        --default-pipeline=<string>                    - The default optimizer pipeline used for callables
+        --max-iterations=<uint>                        - Maximum number of iterations when inlining within an SCC
+        --op-pipelines=<pass-manager>                  - Callable operation specific optimizer pipelines (in the form of `dialect.op(pipeline)`)
+      --int-range-optimizations                        -   Do optimizations based on integer range analysis
+      --loop-invariant-code-motion                     -   Hoist loop invariant instructions outside of the loop
+      --lower-affine-to-scf                            -   Lower affine operations to a mix of SCF and standard operations
+      --lower-cf-to-handshake                          -   Lowers func and cf dialects to handshake.
+      --lower-handshake-to-hw                          -   Lowers Handshake to HW.
+      --lower-scf-to-cf                                -   Lower scf dialect to unstructured control flow (cf)
+      --mark-memory-dependencies                       -   Mark all memory dependencies in the IR.
+      --mark-memory-interfaces                         -   Mark memory accesses with the interface they should connect to.
+      --mem2reg                                        -   Promotes memory slots into values.
+        --region-simplify                              - Perform control flow optimizations to the region tree
+      --memref-emulate-wide-int                        -   Emulate 2*N-bit integer operations using N-bit operations
+        --widest-int-supported=<uint>                  - Widest integer type supported by the target
+      --memref-expand                                  -   Legalize memref operations to be convertible to LLVM.
+      --name-all-operations                            -   Gives a unique name to each operation in the IR.
+      --normalize-memrefs                              -   Normalize memrefs
+      --print-ir                                       -   Print IR on the debug stream
+        --label=<string>                               - Label
+      --print-op-stats                                 -   Print statistics of operations
+        --json                                         - print the stats as JSON
+      --push-constants                                 -   Push constant definitions to blocks using them.
+      --remove-dead-values                             -   Remove dead values
+      --remove-operation-names                         -   Deletes the unique name of all operations in the IR.
+      --remove-polygeist-attributes                    -   Removes useless module and function attributes set by Polygeist.
+      --resolve-ranked-shaped-type-result-dims         -   Resolve memref.dim of result values of ranked shape type
+      --resolve-shaped-type-result-dims                -   Resolve memref.dim of result values
+      --sccp                                           -   Sparse Conditional Constant Propagation
+      --scf-bufferize                                  -   Bufferize the scf dialect.
+      --scf-for-loop-canonicalization                  -   Canonicalize operations within scf.for loop bodies
+      --scf-for-loop-peeling                           -   Peel `for` loops at their upper bounds.
+        --skip-partial                                 - Do not peel loops inside of the last, partial iteration of another already peeled loop.
+      --scf-for-loop-range-folding                     -   Fold add/mul ops into loop range
+      --scf-for-loop-specialization                    -   Specialize `for` loops for vectorization
+      --scf-for-to-while                               -   Convert SCF for loops to SCF while loops
+      --scf-parallel-loop-fusion                       -   Fuse adjacent parallel loops
+      --scf-parallel-loop-specialization               -   Specialize parallel loops for vectorization
+      --scf-parallel-loop-tiling                       -   Tile parallel loops
+        --no-min-max-bounds                            - Perform tiling with fixed upper bound with inbound check inside the internal loops
+        --parallel-loop-tile-sizes=<long>              - Factors to tile parallel loops by
+      --scf-rotate-for-loops                           -   Transforms eligible for loops into do-while's
+      --scf-simple-if-to-select                        -   Transforms if's with simple bodies into select's.
+      --snapshot-op-locations                          -   Generate new locations from the current IR
+        --filename=<string>                            - The filename to print the generated IR
+        --tag=<string>                                 - A tag to use when fusing the new locations with the original. If unset, the locations are replaced.
+      --spec-annotate-paths                            -   Adds an attribute to mark operations in speculative regions
+      --sroa                                           -   Scalar Replacement of Aggregates
+      --strip-debuginfo                                -   Strip debug info from all operations
+      --symbol-dce                                     -   Eliminate dead symbols
+      --symbol-privatize                               -   Mark symbols private
+        --exclude=<string>                             - Comma separated list of symbols that should not be marked private
+      --test-rtl-support                               -   Test RTL support (RTL configuration file parsing)
+        --rtl-config-path=<string>                     - Pass to JSON-formatted RTL configuration
+      --test-scf-parallel-loop-collapsing              -   Test parallel loops collapsing transformation
+        --collapsed-indices-0=<uint>                   - Which loop indices to combine 0th loop index
+        --collapsed-indices-1=<uint>                   - Which loop indices to combine into the position 1 loop index
+        --collapsed-indices-2=<uint>                   - Which loop indices to combine into the position 2 loop index
+      --topological-sort                               -   Sort regions without SSA dominance in topological order
+      --tutorial-handshake-greedy-simplify-merge-like  -   Greedy merge-like operation simplification.
+      --tutorial-handshake-simplify-merge-like         -   Simplifies merge-like operations in Handshake functions.
+      --view-op-graph                                  -   Print Graphviz visualization of an operation
+        --max-label-len=<uint>                         - Limit attribute/type length to number of chars
+        --print-attrs                                  - Print attributes of operations
+        --print-control-flow-edges                     - Print control flow edges
+        --print-data-flow-edges                        - Print data flow edges
+        --print-result-types                           - Print result types of operations
+  --disable-i2p-p2i-opt                                - Disables inttoptr/ptrtoint roundtrip optimization
+  --dump-pass-pipeline                                 - Print the pipeline that will be run
+  --emit-bytecode                                      - Emit bytecode when generating output
+  --emit-bytecode-version=<value>                      - Use specified bytecode when generating output
+  --irdl-file=<filename>                               - IRDL file to register before processing the input
+  --load-dialect-plugin=<string>                       - Load dialects from plugin library
+  --load-pass-plugin=<string>                          - Load passes from plugin library
+  --log-actions-to=<string>                            - Log action execution to a file, or stderr if  '-' is passed
+  --log-mlir-actions-filter=<string>                   - Comma separated list of locations to filter actions from logging
+  --mlir-debug-counter=<string>                        - Comma separated list of debug counter skip and count arguments
+  --mlir-disable-threading                             - Disable multi-threading within MLIR, overrides any further call to MLIRContext::enableMultiThreading()
+  --mlir-elide-elementsattrs-if-larger=<uint>          - Elide ElementsAttrs with "..." that have more elements than the given upper limit
+  --mlir-elide-resource-strings-if-larger=<uint>       - Elide printing value of resources if string is too long in chars.
+  --mlir-enable-debugger-hook                          - Enable Debugger hook for debugging MLIR Actions
+  --mlir-pass-pipeline-crash-reproducer=<string>       - Generate a .mlir reproducer file at the given output path if the pass manager crashes or fails
+  --mlir-pass-pipeline-local-reproducer                - When generating a crash reproducer, attempt to generated a reproducer with the smallest pipeline.
+  --mlir-pass-statistics                               - Display the statistics of each pass
+  --mlir-pass-statistics-display=<value>               - Display method for pass statistics
+    =list                                              -   display the results in a merged list sorted by pass name
+    =pipeline                                          -   display the results with a nested pipeline view
+  --mlir-pretty-debuginfo                              - Print pretty debug info in MLIR output
+  --mlir-print-debug-counter                           - Print out debug counter information after all counters have been accumulated
+  --mlir-print-debuginfo                               - Print debug info in MLIR output
+  --mlir-print-elementsattrs-with-hex-if-larger=<long> - Print DenseElementsAttrs with a hex string that have more elements than the given upper limit (use -1 to disable)
+  --mlir-print-ir-after=<pass-arg>                     - Print IR after specified passes
+  --mlir-print-ir-after-all                            - Print IR after each pass
+  --mlir-print-ir-after-change                         - When printing the IR after a pass, only print if the IR changed
+  --mlir-print-ir-after-failure                        - When printing the IR after a pass, only print if the pass failed
+  --mlir-print-ir-before=<pass-arg>                    - Print IR before specified passes
+  --mlir-print-ir-before-all                           - Print IR before each pass
+  --mlir-print-ir-module-scope                         - When printing IR for print-ir-[before|after]{-all} always print the top-level operation
+  --mlir-print-local-scope                             - Print with local scope and inline information (eliding aliases for attributes, types, and locations
+  --mlir-print-op-on-diagnostic                        - When a diagnostic is emitted on an operation, also print the operation as an attached note
+  --mlir-print-stacktrace-on-diagnostic                - When a diagnostic is emitted, also print the stack trace as an attached note
+  --mlir-print-value-users                             - Print users of operation results and block arguments as a comment
+  --mlir-timing                                        - Display execution times
+  --mlir-timing-display=<value>                        - Display method for timing data
+    =list                                              -   display the results in a list sorted by total time
+    =tree                                              -   display the results ina with a nested tree view
+  --no-implicit-module                                 - Disable implicit addition of a top-level module op during parsing
+  -o <filename>                                        - Output filename
+  --pass-pipeline=<string>                             - Textual description of the pass pipeline to run
+  --run-reproducer                                     - Run the pipeline stored in the reproducer
+  --show-dialects                                      - Print the list of registered dialects and exit
+  --split-input-file                                   - Split the input file into pieces and process each chunk independently
+  --verify-diagnostics                                 - Check that emitted diagnostics match expected-* lines on the corresponding line
+  --verify-each                                        - Run the verifier after each transformation pass
+  --verify-roundtrip                                   - Round-trip the IR after parsing and ensure it succeeds
+
+Generic Options:
+
+  --help                                               - Display available options (--help-hidden for more)
+  --help-list                                          - Display list of available options (--help-list-hidden for more)
+  --version                                            - Display the version of this program

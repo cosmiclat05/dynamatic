@@ -1,4 +1,5 @@
-//===- CutEnumeration.h - Exp. support for MAPBUF buffer placement -------*- C++ -*-===//
+//===- CutEnumeration.h - Exp. support for MAPBUF buffer placement -------*- C++
+//-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -17,242 +18,91 @@
 #include "gurobi_c++.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Block.h"
-#include "mlir/IR/Dominance.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Region.h"
 #include "mlir/Pass/Pass.h"
+#include "BlifReader.h"
 
-#include <string>
+#include <fstream>
 #include <set>
-#include <vector>
+#include <string>
 #include <unordered_map>
-#include <fstream>  // Add this line
+#include <vector>
 
 using namespace mlir;
 
 namespace dynamatic {
 namespace experimental {
 
-class BlifData{
-private:
-    std::string m_modulename;
-    std::set<std::string> m_inputs;
-    std::set<std::string> m_outputs;
-    std::set<std::string> nodes;
-    std::set<std::string> m_latchInputs;
-    std::set<std::string> m_latchOutputs;
-    std::unordered_map<std::string, std::string> m_latches;
-    std::set<std::string> m_constZeroNodes;
-    std::set<std::string> m_constOneNodes;
-
-    std::vector<std::string> m_signals;
-    std::unordered_map<std::string, std::set<std::string>> m_nodeFanins;
-    std::unordered_map<std::string, std::set<std::string>> m_nodeFanouts;
-    std::unordered_map<std::string, std::string> m_nodeFunctions;
-
-    std::vector<std::string> m_nodesTopologicalOrder;
-
-    std::unordered_map<std::string, std::set<std::string>> m_submodules;
-
-    std::set<std::string> m_primaryInputs;
-    std::set<std::string> m_primaryOutputs;
-
-public:
-    BlifData() = default;
-
-    void setModuleName(const std::string& moduleName) {
-        m_modulename = moduleName;
-    }
-
-    void addInput(const std::string& input) {
-        m_inputs.insert(input);
-    }
-
-    void addOutput(const std::string& output) {
-        m_outputs.insert(output);
-    }
-
-    void addNodes(const std::string& node) {
-        nodes.insert(node);
-    }
-
-    void addRegInput(const std::string& latchInput) {
-        m_latchInputs.insert(latchInput);
-    }
-
-    void addRegOutput(const std::string& latchOutput) {
-        m_latchOutputs.insert(latchOutput);
-    }
-
-    void addLatch(const std::string& latchInput, const std::string& latchOutput) {
-        m_latches[latchInput] = latchOutput;
-    }
-
-    void addConstZeroNode(const std::string& node) {
-        m_constZeroNodes.insert(node);
-    }
-
-    void addConstOneNode(const std::string& node) {
-        m_constOneNodes.insert(node);
-    }
-
-    void addSignal(const std::string& signal) {
-        m_signals.push_back(signal);
-    }
-
-    void addNodeFanins(const std::string& node, const std::set<std::string>& fanins) {
-        m_nodeFanins[node] = fanins;
-    }
-
-    std::set<std::string>& getNodeFanins(const std::string& node){
-        return m_nodeFanins[node];
-    }
-
-
-    void addNodeFanouts(const std::string& node, const std::set<std::string>& fanouts) {
-        m_nodeFanouts[node] = fanouts;
-    }
-
-    void addNodeFunctions(const std::string& node, const std::string& function) {
-        m_nodeFunctions[node] = function;
-    }
-
-    void addSubmodule(const std::string& submodule, const std::set<std::string>& signals) {
-        m_submodules[submodule] = signals;
-    }
-
-    bool isPrimaryInput(const std::string& input) const {
-        return m_primaryInputs.count(input) > 0;
-    }
-
-    bool isPrimaryOutput(const std::string& output) const {
-        return m_primaryOutputs.count(output) > 0;
-    }
-
-    bool isInput(const std::string& input) const {
-        return m_inputs.count(input) > 0;
-    }
-
-    bool isOutput(const std::string& output) const {
-        return m_outputs.count(output) > 0;
-    }
-
-    bool isRegInput(const std::string& regInput) const {
-        return m_latchInputs.count(regInput) > 0;
-    }
-
-    bool isRegOutput(const std::string& regOutput) const {
-        return m_latchOutputs.count(regOutput) > 0;
-    }
-
-    void printModuleInfo();
-
-    void traverseNodes();
-
-    void traverseUtil(const std::string& node, std::set<std::string>& visitedNodes);
-
-    std::set<std::string> getPrimaryInputs() const;
-
-    std::set<std::string> getPrimaryOutputs() const;
-
-    std::set<std::string> getNodes() const;
-
-    std::set<std::string> getFanouts(const std::string& node) const{
-        if (m_nodeFanouts.count(node) > 0) {
-            return m_nodeFanouts.at(node);
-        } else {
-            return std::set<std::string>();
-        }
-    }
-
-    std::set<std::string> getFanins(const std::string& node) const{
-        if (m_nodeFanins.count(node) > 0) {
-            return m_nodeFanins.at(node);
-        } else {
-            return std::set<std::string>();
-        }
-    }
-
-    std::vector<std::string> findPath(const std::string& start, const std::string& end);
-};
-
-class BlifParser{ 
-public:
-    BlifParser() = default;
-    BlifData parseBlifFile(const std::string& filename);
-};
-
 class Cut {
 public:
   GRBVar nodeVar;
   GRBVar cutSelection;
-  std::string node;
-  std::vector<std::string> leaves;
+  std::string root;
+  std::set<std::string> leaves;
+  int depth;
 
-    Cut(const std::string& n) : node(n) {}
-    
-    void addLeaf(const std::string& leaf) {
-        leaves.push_back(leaf);
-    }
-    
-    const std::string& getNode() const {
-        return node;
-    }
-    
-    const std::vector<std::string>& getLeaves() const {
-        return leaves;
-    }
+  Cut(std::string root, int depth = 0) : root(root), depth(depth) {};
+  Cut(std::string root, std::string leaf, int depth = 0) : root(root), leaves(std::set<std::string>{leaf}), depth(depth) {}; //for trivial cuts
+  Cut(std::string root, std::set<std::string> leaves, int depth = 0) : root(root), leaves(leaves), depth(depth) {};
+
+  void addLeaf(const std::string &leaf) { leaves.insert(leaf); }
+
+  const std::string &getNode() const { return root; }
+
+  const std::set<std::string> &getLeaves() const { return leaves; }
+
+  void setLeaves(std::set<std::string>& leaves){
+      this->leaves = leaves;
+  }
+
+  void addLeaves(std::set<std::string>& leaves){
+      this->leaves.insert(leaves.begin(), leaves.end());
+  }
+
+  std::string getRoot() const{
+      return root;
+  }
+
+  int getDepth() const{
+      return depth;
+  }
 };
 
 class Cuts {
 public:
-    std::unordered_map<std::string, std::vector<Cut> > cuts;  
+  static inline std::unordered_map<std::string, std::vector<Cut>> cuts;
+  experimental::BlifData blif;
+  int lutSize{};
+  int maxExpansion{};
 
-    void addCut(const std::string& node, const Cut& newCut){
-      if (cuts.find(node) == cuts.end()) {
-          cuts[node] = std::vector<Cut>();
-      }
-      cuts[node].push_back(newCut);
+  Cuts(BlifData& blif, int lutSize, int maxExpansion) : blif(blif), lutSize(lutSize), maxExpansion(maxExpansion){};
+  
+  std::vector<Cut> enumerateCuts(const std::string& node, const std::vector<std::vector<Cut>>& faninCuts, int lutSize);
+  std::unordered_map<std::string, std::vector<Cut>> computeAllCuts();
+  std::unordered_map<std::string, std::vector<Cut>> cutless();
+  std::unordered_map<std::string, std::vector<Cut>> cutlessReal();
+
+  void runCutAlgos(bool computeAllCuts, bool cutless, bool cutlessReal, bool anchors);
+  void readFromFile(const std::string &filename);
+  static void printCuts(std::string filename);
+
+  void addCut(const std::string &node, const Cut &newCut) {
+    if (cuts.find(node) == cuts.end()) {
+      cuts[node] = std::vector<Cut>();
     }
-    
-    std::vector<Cut> getCuts(const std::string& node){
-      if (cuts.find(node) != cuts.end()) {
-          return cuts[node];
-      }
-      return std::vector<Cut>();
+    cuts[node].push_back(newCut);
+  }
+
+  std::vector<Cut> getCuts(const std::string &node) {
+    if (cuts.find(node) != cuts.end()) {
+      return cuts[node];
     }
-
-    void printCuts(){
-      std::ofstream outFile("cuts_output.txt");
-      if (!outFile.is_open()) {
-          llvm::errs() << "Error: Unable to open file for writing.\n";
-          return;
-      }
-
-      for (const auto& nodeCuts : cuts) {
-          const std::string& node = nodeCuts.first;
-          const std::vector<Cut>& cutList = nodeCuts.second;
-          
-          outFile << "Node: " << node << "\n";
-          
-          for (size_t i = 0; i < cutList.size(); ++i) {
-              const Cut& cut = cutList[i];
-              outFile << "  Cut #" << i << ":\n";
-              
-              const std::vector<std::string>& leaves = cut.getLeaves();
-              for (const auto& leaf : leaves) {
-                  outFile << "    " << leaf << "\n";
-              }
-          }
-          
-          outFile << "\n";
-      }
-
-      outFile.close();
-    }
-    
-    // Method to read from file and populate cuts
-    void readFromFile(const std::string& filename);
+    return std::vector<Cut>();
+  }
+ 
+  // Method to read from file and populate cuts
+  
 };
 
 } // namespace experimental

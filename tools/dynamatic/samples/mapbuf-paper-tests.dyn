@@ -1,0 +1,65 @@
+# Fully run (from C to synthesis) all integration tests available on the 
+# repository
+
+# Indicate the path to Dynamatic's top-level directory here (leave unchanged if
+# running the frontend from the top-level directory)
+set-dynamatic-path  .
+
+set-src           integration-test/fir/fir.c
+compile --simple-buffers
+write-hdl --hdl verilog
+compile
+write-hdl
+simulate
+synthesize
+
+set-src           integration-test/gaussian/gaussian.c
+compile --simple-buffers
+write-hdl --hdl verilog
+compile
+write-hdl
+simulate
+synthesize
+
+set-src           integration-test/gemver/gemver.c
+compile --simple-buffers
+write-hdl --hdl verilog
+compile
+write-hdl
+simulate
+synthesize
+
+set-src           integration-test/insertion_sort/insertion_sort.c
+compile --simple-buffers
+write-hdl --hdl verilog
+compile
+write-hdl
+simulate
+synthesize
+
+set-src           integration-test/matrix/matrix.c
+compile --simple-buffers
+write-hdl --hdl verilog
+compile
+write-hdl
+simulate
+synthesize
+
+set-src           integration-test/stencil_2d/stencil_2d.c
+compile --simple-buffers
+write-hdl --hdl verilog
+compile
+write-hdl
+simulate
+synthesize
+
+set-src           integration-test/cnn/cnn.c
+compile --simple-buffers
+write-hdl --hdl verilog
+compile
+write-hdl
+simulate
+synthesize
+
+# Exit the frontend
+exit 

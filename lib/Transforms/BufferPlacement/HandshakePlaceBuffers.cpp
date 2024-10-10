@@ -31,6 +31,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/raw_ostream.h"
 #include <string>
 
 using namespace mlir;
@@ -98,7 +99,8 @@ BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
 
 HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
+    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs,
+    StringRef blifFile) {
   this->algorithm = algorithm.str();
   this->frequencies = frequencies.str();
   this->timingModels = timingModels.str();
@@ -106,6 +108,7 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->targetCP = targetCP;
   this->timeout = timeout;
   this->dumpLogs = dumpLogs;
+  this->blifFile = blifFile.str();
 }
 
 void HandshakePlaceBuffersPass::runDynamaticPass() {
@@ -120,7 +123,8 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
       allAlgorithms;
   allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
-  allAlgorithms[CUT_LOOPBACKS] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
+  allAlgorithms[CUT_LOOPBACKS] =
+      &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPGA20_LEGACY] = &HandshakePlaceBuffersPass::placeUsingMILP;
@@ -478,7 +482,8 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   if (algorithm == MAPBUF) {
     // Create and solve the MILP
     return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
-        logger, "placement", placement, env, info, timingDB, targetCP);
+        logger, "placement", placement, env, info, timingDB, targetCP,
+        blifFile);
   }
 
   llvm_unreachable("unknown algorithm");
@@ -535,18 +540,19 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       // Make sure that all the loops are cut by placing at least one buffer
       funcOp.walk([&](mlir::Operation *op) {
         for (Value result : op->getResults()) {
-          op->emitRemark() << "Channel Name: "
-                           << getUniqueName(*result.getUses().begin()) << "\n";
+          // op->emitRemark() << "Channel Name: "
+          //                  << getUniqueName(*result.getUses().begin()) <<
+          //                  "\n";
           for (Operation *user : result.getUsers()) {
-
             if (isBackedge(result, user)) {
+              llvm::errs() << "backedge found" << result << "\n";
               ChannelBufProps &resProps = channelProps[op->getResult(0)];
               if (resProps.maxTrans.value_or(1) >= 1) {
                 resProps.minTrans = std::max(resProps.minTrans, 1U);
               } else {
                 op->emitWarning()
-                    << "Cannot place opaque buffer on merge-like operation's "
-                       "output due to channel-specific buffering constraints. "
+                    << "Cannot place opaque buffer on loopback "
+                       "due to channel-specific buffering constraints. "
                        "This "
                        "may "
                        "yield an invalid buffering.";
@@ -555,8 +561,8 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
                 resProps.minOpaque = std::max(resProps.minOpaque, 1U);
               } else {
                 op->emitWarning()
-                    << "Cannot place opaque buffer on merge-like operation's "
-                       "output due to channel-specific buffering constraints. "
+                    << "Cannot place opaque buffer on loopback "
+                       "due to channel-specific buffering constraints. "
                        "This "
                        "may "
                        "yield an invalid buffering.";
@@ -617,10 +623,13 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::buffer::createHandshakePlaceBuffers(
-    StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
+dynamatic::buffer::createHandshakePlaceBuffers(StringRef algorithm,
+                                               StringRef frequencies,
+                                               StringRef timingModels,
+                                               bool firstCFDFC, double targetCP,
+                                               unsigned timeout, bool dumpLogs,
+                                               StringRef blifFile) {
   return std::make_unique<HandshakePlaceBuffersPass>(
       algorithm, frequencies, timingModels, firstCFDFC, targetCP, timeout,
-      dumpLogs);
+      dumpLogs, blifFile);
 }

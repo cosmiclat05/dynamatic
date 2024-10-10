@@ -10,8 +10,9 @@ SRC_DIR="/home/oyasar/dynamatic/integration-test/small/"
 OUTPUT_DIR="/home/oyasar/dynamatic/integration-test/small/out/"
 KERNEL_NAME="small"
 #USE_SIMPLE_BUFFERS=$5
-TARGET_CP=6.2
+TARGET_CP=4.2
 #POLYGEIST_PATH=$7
+MAPBUF_BLIF_DIR=$8
 
 source "$SRC_DIR"/utils.sh
 
@@ -20,6 +21,7 @@ CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
+PYTHON_SCRIPT_MAPBUF="/home/oyasar/mapbuf_external/dist/Verilog/Verilog"
 
 # Generated directories/files
 COMP_DIR="$OUTPUT_DIR/comp"
@@ -62,11 +64,15 @@ export_dot() {
 rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
 # Smart buffer placement
+
+
+"$PYTHON_SCRIPT_MAPBUF" "$KERNEL_NAME" "$OUTPUT_DIR"
+
 echo_info "Running smart buffer placement with CP = $TARGET_CP"
 cd "$COMP_DIR"
 "$DYNAMATIC_OPT_BIN" "$SRC_DIR/handshake_buffered.mlir" \
   --handshake-set-buffering-properties="version=fpga20" \
-  --handshake-place-buffers="algorithm=mapbuf frequencies=$SRC_DIR/frequencies.csv timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
+  --handshake-place-buffers="algorithm=mapbuf frequencies=$SRC_DIR/frequencies.csv timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=120 dump-logs blif-file=$OUTPUT_DIR/mapbuf/" \
   > "$F_HANDSHAKE_BUFFERED"
 exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
 
