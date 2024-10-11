@@ -6,11 +6,12 @@ set-dynamatic-path  .
 
 # Set the source file to run (kernel must have the same name as the filename,
 # without the extension)
-set-src             integration-test/cnn/cnn.c
+set-src             integration-test/matrix/matrix.c
 
-compile 
-write-hdl 
+compile
+write-hdl
+
 simulate
-synthesize
 
+synthesize
 

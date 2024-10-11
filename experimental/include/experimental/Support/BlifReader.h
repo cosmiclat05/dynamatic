@@ -137,6 +137,10 @@ public:
     return m_latchOutputs.count(regOutput) > 0;
   }
 
+  bool isConstantNode(const std::string &node) const {
+    return m_constZeroNodes.count(node) > 0 || m_constOneNodes.count(node) > 0;
+  }
+
   void printModuleInfo();
 
   void traverseNodes();

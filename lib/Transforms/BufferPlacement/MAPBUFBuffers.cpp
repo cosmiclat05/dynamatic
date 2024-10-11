@@ -211,7 +211,7 @@ enum ConstraintNames {
 constexpr std::string_view getConstraintName(ConstraintNames constraint) {
   switch (constraint) {
   case oneCut_noBuf:
-    return "oneCut_noBuf";
+    return "oneCut_noBusssf";
   case oneCut_Buf:
     return "oneCut_Buf";
   case moreCut_noBuf:
@@ -377,41 +377,21 @@ void MAPBUFBuffers::addCutLoopbackBuffers() {
   auto funcOp = funcInfo.funcOp;
   funcOp.walk([&](mlir::Operation *op) {
     for (Value result : op->getResults()) {
-      // op->emitRemark() << "Channel Name: "
-      //                  << getUniqueName(*result.getUses().begin()) <<
-      //                  "\n";
       for (Operation *user : result.getUsers()) {
         if (isBackedge(result, user)) {
-          llvm::errs() << "backedge found" << result << "\n";
           handshake::ChannelBufProps &resProps = channelProps[op->getResult(0)];
           if (resProps.maxTrans.value_or(1) >= 1) {
-            // resProps.minTrans = std::max(resProps.minTrans, 1U);
             GRBVar &bufVar = vars.channelVars[op->getResult(0)]
                                  .signalVars[SignalType::READY]
                                  .bufPresent;
-            model.addConstr(bufVar == 1, "backedge_ready");
-          } else {
-            op->emitWarning()
-                << "Cannot place opaque buffer on loopback "
-                   "due to channel-specific buffering constraints. "
-                   "This "
-                   "may "
-                   "yield an invalid buffering.";
-          }
+            model.addConstr(bufVar == 0, "backedge_ready");
+          } 
           if (resProps.maxOpaque.value_or(1) >= 1) {
-            // resProps.minOpaque = std::max(resProps.minOpaque, 1U);
             GRBVar &bufVar = vars.channelVars[op->getResult(0)]
                                  .signalVars[SignalType::DATA]
                                  .bufPresent;
-            model.addConstr(bufVar == 1, "backedge_data");
-          } else {
-            op->emitWarning()
-                << "Cannot place opaque buffer on loopback "
-                   "due to channel-specific buffering constraints. "
-                   "This "
-                   "may "
-                   "yield an invalid buffering.";
-          }
+            model.addConstr(bufVar == 0, "backedge_data");
+          } 
         }
       }
     }
@@ -419,7 +399,6 @@ void MAPBUFBuffers::addCutLoopbackBuffers() {
 }
 
 void MAPBUFBuffers::addBlackboxConstraints() {
-
   for (auto &[channel, _] : channelProps) {
     Operation *definingOp = channel.getDefiningOp();
     if (!definingOp) {
@@ -428,8 +407,18 @@ void MAPBUFBuffers::addBlackboxConstraints() {
 
     auto numOps = definingOp->getNumOperands();
     for (unsigned int i = 0; i < numOps; i++) {
-      if ((getUniqueName(definingOp).find("subi") != std::string::npos ||
-           getUniqueName(definingOp).find("addi") != std::string::npos)) {
+      auto isSubi = getUniqueName(definingOp).find("subi") != std::string::npos;
+      auto isAddi = getUniqueName(definingOp).find("addi") != std::string::npos;
+      auto isCmpi = getUniqueName(definingOp).find("cmpi") != std::string::npos;
+
+      if (isSubi || isAddi || isCmpi) {
+
+        unsigned int bitwidth =
+            handshake::getHandshakeTypeBitWidth(channel.getType());
+        if (isCmpi && bitwidth <= 4) {
+          continue;
+        }
+
         ChannelVars &channelVars = vars.channelVars[channel];
         Value definingChannel = definingOp->getOperand(i);
         ChannelSignalVars &validVars =
@@ -448,10 +437,10 @@ void MAPBUFBuffers::addBlackboxConstraints() {
                                    .signalVars[SignalType::READY]
                                    .path.tIn;
 
-        model.addConstr(adderOutReadyPathOut <= adderInReady,
+        model.addConstr(adderOutReadyPathOut == adderInReady,
                         "adderConstraint_ready");
 
-        model.addConstr(adderInValid <= adderOutValidPathIn,
+        model.addConstr(adderInValid == adderOutValidPathIn,
                         "adderConstraint_valid");
 
         ChannelSignalVars &dataVars = channelVars.signalVars[SignalType::DATA];
@@ -464,9 +453,30 @@ void MAPBUFBuffers::addBlackboxConstraints() {
         std::map<unsigned int, double> adderDelay = {{1, 0.587},  {2, 0.587},
                                                      {4, 0.993},  {8, 0.991},
                                                      {16, 1.099}, {32, 1.315}};
-        unsigned int bitwidth =
-            handshake::getHandshakeTypeBitWidth(channel.getType());
+
+        std::map<unsigned int, double> compDelay = {{1, 0.587}, {2, 0.587},
+                                                    {4, 0.993}, {8, 0.6},
+                                                    {16, 0.8},  {32, 1.005}};
+
         double delay = 0.0;
+
+        if (getUniqueName(definingOp).find("cmpi") != std::string::npos) {
+          // Find the smallest key in compDelay that is greater than or equal to
+          // bitwidth
+          auto it = compDelay.lower_bound(bitwidth);
+          if (it == compDelay.end() || it->first != bitwidth) {
+            // If bitwidth is not exactly a key, use the next higher key
+            it = compDelay.upper_bound(bitwidth);
+          }
+          if (it != compDelay.end()) {
+            delay = it->second;
+          }
+          model.addConstr(adderInData + delay == adderOutPathIn,
+                          "adderConstraint_" + std::to_string(bitwidth));
+
+          continue;
+        }
+
         // Find the smallest key in adderDelay that is greater than or equal
         // to bitwidth
         auto it = adderDelay.lower_bound(bitwidth);
@@ -478,28 +488,37 @@ void MAPBUFBuffers::addBlackboxConstraints() {
           delay = it->second;
         }
 
-        model.addConstr(adderInData + delay <= adderOutPathIn,
+        model.addConstr(adderInData + delay == adderOutPathIn,
                         "adderConstraint_" + std::to_string(bitwidth));
       }
     }
   }
-}
-
-void MAPBUFBuffers::addClockPeriodConstraints(
-    experimental::BlifData &blif,
-    std::unordered_map<std::string, GRBVar> &nodeToGRB) {
-  for (auto &node : blif.getNodes()) {
-    GRBVar &nodeVar = nodeToGRB[node];
-    nodeVar = model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node);
-    model.update();
-    if (blif.isPrimaryInput(node)) {
-      model.addConstr(nodeVar == 0, "input_delay");
-    } else {
-      model.addConstr(nodeVar <= targetPeriod, "clock_period_constraint");
-    }
-  }
   model.update();
 }
+
+// void MAPBUFBuffers::addClockPeriodConstraints(
+//     experimental::BlifData &blif,
+//     std::unordered_map<std::string, GRBVar> &nodeToGRB, VariableSearcher& pathInSearcher) {
+//   for (auto &node : blif.getNodes()) {
+//     GRBVar &nodeVar = nodeToGRB[node];
+//     nodeVar = model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node);
+//     model.update();
+//     if (blif.isPrimaryInput(node)) {
+//       model.addConstr(nodeVar == 0, "input_delay");
+//       std::string pathInName = retrieveChannelName(node, "pathIn").str();
+//       if (blif.isConstantNode(node)) {
+//         std::string pathInName = retrieveChannelName(node, "pathIn").str();
+//         GRBVar nodeVarChannel =
+//             pathInSearcher.variableIncludes(pathInName, nodeToGRB, node);
+
+//         model.addConstr(nodeVar == nodeVarChannel, "primary_input_channel");
+//       }
+//     } else {
+//       model.addConstr(nodeVar <= targetPeriod, "clock_period_constraint");
+//     }
+//   }
+//   model.update();
+// }
 
 void MAPBUFBuffers::setup() {
   // Signals for which we have variables
@@ -515,10 +534,10 @@ void MAPBUFBuffers::setup() {
       parser.parseBlifFile(blifFile.str() + "anchored_strashed.blif");
 
   experimental::Cuts cutsAnchorsRemoved(anchorsRemoved, 6, 0);
-  cutsAnchorsRemoved.runCutAlgos(true, true, false, false);
+  cutsAnchorsRemoved.runCutAlgos(false, true, false, false);
 
   experimental::Cuts cutsWithAnchors(withAnchors, 6, 0);
-  cutsWithAnchors.runCutAlgos(false, true, false, true);
+  cutsWithAnchors.runCutAlgos(true, true, false, true);
   experimental::Cuts::printCuts("cuts.txt");
 
   /// NOTE: (lucas-rami) For each buffering group this should be the timing
@@ -543,6 +562,9 @@ void MAPBUFBuffers::setup() {
   std::vector<GRBVar> pathInVarsVector;
   std::vector<GRBVar> pathOutVarsVector;
 
+  GRBVar clockVar = model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "clock");
+  model.addConstr(clockVar == targetPeriod, "clock_period");
+
   for (auto &[channel, _] : channelProps) {
     // Create channel variables and constraints
     allChannels.push_back(channel);
@@ -550,39 +572,49 @@ void MAPBUFBuffers::setup() {
     addCustomChannelConstraints(channel);
     ChannelVars &channelVars = vars.channelVars[channel];
 
-    if (!channel.getDefiningOp<handshake::MemoryOpInterface>() &&
-        !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin())) {
-      for (auto &signal : signals) {
-        std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
-        ChannelSignalVars &signalVars = channelVars.signalVars[signal];
-        GRBVar &bufVarSignal =
-            vars.channelVars[channel].signalVars[signal].bufPresent;
-        GRBVar &t1 = signalVars.path.tIn;
-        GRBVar &t2 = signalVars.path.tOut;
-        model.addConstr(t2 <= targetPeriod, "pathOut_period");
-        model.addConstr(t1 <= targetPeriod, "pathIn_period");
-        model.addConstr(t2 - t1 + 100 * bufVarSignal >= 0, "buf_delay");
+    GRBVar &bufPresent = channelVars.bufPresent;
+    GRBVar &bufNumSlots = channelVars.bufNumSlots;
+    GRBVar &bufVarData =
+        vars.channelVars[channel].signalVars[SignalType::DATA].bufPresent;
+    GRBVar &bufVarReady =
+        vars.channelVars[channel].signalVars[SignalType::READY].bufPresent;
 
-        pathInVarsVector.push_back(t1);
-        pathOutVarsVector.push_back(t2);
-        bufVarsVector.push_back(bufVarSignal);
-      }
-      // addChannelElasticityConstraints(channel, bufGroups);
+    model.addConstr(bufVarData + bufVarReady == bufNumSlots, "buf_slots");
+
+    model.addConstr(bufVarData <= bufVarReady, "buf_order");
+
+    // if (!channel.getDefiningOp<handshake::MemoryOpInterface>() &&
+    //     !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin())) {
+    for (auto &signal : signals) {
+      std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
+      ChannelSignalVars &signalVars = channelVars.signalVars[signal];
+      GRBVar &bufVarSignal =
+          vars.channelVars[channel].signalVars[signal].bufPresent;
+      GRBVar &t1 = signalVars.path.tIn;
+      GRBVar &t2 = signalVars.path.tOut;
+      model.addConstr(t2 <= clockVar, "pathOut_period");
+      model.addConstr(t1 <= clockVar, "pathIn_period");
+      model.addConstr(t2 - t1 + 100 * bufVarSignal >= 0, "buf_delay");
+
+      pathInVarsVector.push_back(t1);
+      pathOutVarsVector.push_back(t2);
+      bufVarsVector.push_back(bufVarSignal);
     }
-    
+    addChannelElasticityConstraints(channel, bufGroups);
+    // }
   }
 
-  ChannelFilter channelFilter = [&](Value channel) -> bool {
-    Operation *defOp = channel.getDefiningOp();
-    return !isa_and_present<handshake::MemoryOpInterface>(defOp) &&
-           !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin());
-  };
+  // ChannelFilter channelFilter = [&](Value channel) -> bool {
+  //   Operation *defOp = channel.getDefiningOp();
+  //   return !isa_and_present<handshake::MemoryOpInterface>(defOp) &&
+  //          !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin());
+  // };
 
-  for (Operation &op : funcInfo.funcOp.getOps()) {
-    // addUnitElasticityConstraints(&op, channelFilter);
-  }
+  // for (Operation &op : funcInfo.funcOp.getOps()) {
+  //   // addUnitElasticityConstraints(&op, channelFilter);
+  // }
 
-  addClockPeriodConstraints(anchorsRemoved, nodeToGRB);
+ // addClockPeriodConstraints(anchorsRemoved, nodeToGRB);
 
   addBlackboxConstraints();
 
@@ -593,8 +625,26 @@ void MAPBUFBuffers::setup() {
   VariableSearcher bufSearcher(bufVarsVector);
   VariableSearcher pathInSearcher(pathInVarsVector);
   VariableSearcher pathOutSearcher(pathOutVarsVector);
-  llvm::errs() << "added all cuts"
-               << "\n";
+
+  for (auto &node : anchorsRemoved.getNodes()) {
+    GRBVar &nodeVar = nodeToGRB[node];
+    nodeVar = model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node);
+    model.update();
+    if (anchorsRemoved.isPrimaryInput(node)) {
+      model.addConstr(nodeVar == 0, "primary_input");
+
+      // if (anchorsRemoved.isConstantNode(node)) {
+      //   std::string pathInName = retrieveChannelName(node, "pathIn").str();
+      //   GRBVar nodeVarChannel =
+      //       pathInSearcher.variableIncludes(pathInName, nodeToGRB, node);
+
+      //   model.addConstr(nodeVar == nodeVarChannel, "primary_input_channel");
+      // }
+    } else {
+      model.addConstr(nodeVar <= clockVar, "clock_period_constraint");
+    }
+  }
+  model.update();
 
   std::list<GrbConst> constraints;
   std::list<GrbConst> constraintsEqual;
@@ -606,9 +656,28 @@ void MAPBUFBuffers::setup() {
                      boost::hash<std::pair<std::string, std::string>>>
       leafToRootPaths;
 
-#pragma omp parallel for schedule(guided)
+  std::ifstream file(blifFile.str() + "./fpga20_results.txt");
+  std::string line;
+  while (std::getline(file, line)) {
+    std::istringstream iss(line);
+    std::string varName;
+    double value;
+    if (iss >> varName >> value) {
+      // Retrieve the Gurobi variable corresponding to varName
+      auto varOpt = variableExists(model, varName);
+      if (!varOpt) {
+        llvm::errs() << "Variable " << varName << " not found in the model."
+                     << "\n";
+        continue;
+      }
+      GRBVar var = varOpt.value();
+      // Add the equality constraint
+      model.addConstr(var == value, "fpga20_results");
+    }
+  }
+  file.close();
+
   for (int i = 0; i < n; ++i) {
-    std::list<GrbConst> localConstraints;
     auto it = std::next(experimental::Cuts::cuts.begin(), i);
     const auto &key = it->first;
     auto &val = it->second;
@@ -626,11 +695,12 @@ void MAPBUFBuffers::setup() {
           GRBVar faninVar =
               pathOutSearcher.variableIncludes(pathOutName, nodeToGRB, fanIn);
           if (fanIns.size() == 1) {
-            localConstraints.emplace_back(nodeVar, faninVar, 7);
+            model.addConstr(nodeVar == faninVar, "trivial_single_fanin");
             break;
           }
-          localConstraints.emplace_back(nodeVar + (1 - cutSelectionVar) * 100,
-                                        faninVar + 0.6, 0);
+          model.addConstr(nodeVar + (1 - cutSelectionVar) * 100 >=
+                              faninVar + 0.6,
+                          "trivial_multiple_fanin");
         }
         continue;
       }
@@ -640,13 +710,11 @@ void MAPBUFBuffers::setup() {
         GRBVar leafVar =
             pathOutSearcher.variableIncludes(pathOutName, nodeToGRB, leaf);
 
-        localConstraints.emplace_back(nodeVar + (1 - cutSelectionVar) * 100,
-                                      leafVar + 0.6, 4);
+        model.addConstr(nodeVar + (1 - cutSelectionVar) * 100 >= leafVar + 0.6,
+                        "delay_propagation");
 
         std::vector<std::string> path;
         auto leafKeyPair = std::make_pair(leaf, key);
-// llvm::errs() << "leaf: " << leaf << " key: " << key << "\n";
-#pragma omp critical
         {
           if (leafToRootPaths.find(leafKeyPair) != leafToRootPaths.end()) {
             path = leafToRootPaths[leafKeyPair];
@@ -660,7 +728,6 @@ void MAPBUFBuffers::setup() {
               // place a buffer there
               path.erase(path.begin());
             }
-            // llvm::errs() << "path from " << leaf << " to " << key << " is ";
             leafToRootPaths[leafKeyPair] = path;
           }
         }
@@ -673,27 +740,15 @@ void MAPBUFBuffers::setup() {
             GRBVar bufferLeaf;
             if (bufferVars) {
               bufferLeaf = bufferVars.value();
-              localConstraints.emplace_back(1, bufferLeaf + cutSelectionVar, 6);
+
+              model.addConstr(1 >= bufferLeaf + cutSelectionVar,
+                              "cut_selection_conflict");
             }
           }
         }
       }
     }
-#pragma omp critical
-    { constraints.splice(constraints.end(), localConstraints); }
   }
-
-  llvm::errs() << "model description finished"
-               << "\n";
-
-  for (auto &constraint : constraints) {
-    model.addConstr(
-        constraint.lhs >= constraint.rhs,
-        static_cast<std::string>(getConstraintName(constraint.constraintType)));
-  }
-
-  llvm::errs() << "constraints are written"
-               << "\n";
 
   model.update();
 
@@ -707,6 +762,44 @@ void MAPBUFBuffers::setup() {
     addUnitThroughputConstraints(*cfdfc);
   }
 
+  // unsigned totalExecs = 0;
+  // for (Value channel : allChannels) {
+  //   totalExecs += getChannelNumExecs(channel);
+  // }
+
+  // // Create the expression for the MILP objective
+  // GRBLinExpr objective;
+
+  // // For each CFDFC, add a throughput contribution to the objective, weighted
+  // // by the "importance" of the CFDFC
+  // double maxCoefCFDFC = 0.0;
+  // double fTotalExecs = static_cast<double>(totalExecs);
+  // if (totalExecs != 0) {
+  //   for (CFDFC *cfdfc : cfdfcs) {
+  //     double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
+  //     objective += coef * vars.cfVars[cfdfc].throughput;
+  //     maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
+  //   }
+  // }
+
+  // // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
+  // // coefficient to any positive value
+  // if (maxCoefCFDFC == 0.0)
+  //   maxCoefCFDFC = 1.0;
+
+  // // For each channel, add a "penalty" in case a buffer is added to the channel,
+  // // and another penalty that depends on the number of slots
+  // double bufPenaltyMul = 1e-4;
+  // double slotPenaltyMul = 1e-5;
+  // for (Value channel : allChannels) {
+  //   ChannelVars &channelVars = vars.channelVars[channel];
+  //   objective -= maxCoefCFDFC * bufPenaltyMul * channelVars.bufPresent;
+  //   objective -= maxCoefCFDFC * slotPenaltyMul * channelVars.bufNumSlots;
+  // }
+
+  // objective -= bufPenaltyMul * clockVar;
+  // //  Finally, set the MILP objective
+  // model.setObjective(objective, GRB_MAXIMIZE);
   addObjective(allChannels, cfdfcs);
   model.set(GRB_IntParam_DualReductions, 0);
 

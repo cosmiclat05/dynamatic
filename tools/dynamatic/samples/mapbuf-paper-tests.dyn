@@ -21,21 +21,6 @@ write-hdl
 simulate
 synthesize
 
-set-src           integration-test/gemver/gemver.c
-compile --simple-buffers
-write-hdl --hdl verilog
-compile
-write-hdl
-simulate
-synthesize
-
-set-src           integration-test/insertion_sort/insertion_sort.c
-compile --simple-buffers
-write-hdl --hdl verilog
-compile
-write-hdl
-simulate
-synthesize
 
 set-src           integration-test/matrix/matrix.c
 compile --simple-buffers
@@ -46,14 +31,6 @@ simulate
 synthesize
 
 set-src           integration-test/stencil_2d/stencil_2d.c
-compile --simple-buffers
-write-hdl --hdl verilog
-compile
-write-hdl
-simulate
-synthesize
-
-set-src           integration-test/cnn/cnn.c
 compile --simple-buffers
 write-hdl --hdl verilog
 compile

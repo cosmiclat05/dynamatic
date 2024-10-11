@@ -165,14 +165,14 @@ void FPGA20Buffers::setup() {
     // that are not adjacent to a memory interface
     if (!channel.getDefiningOp<handshake::MemoryOpInterface>() &&
         !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin())) {
-      addChannelPathConstraints(channel, SignalType::DATA, bufModel);
+      //addChannelPathConstraints(channel, SignalType::DATA, bufModel);
       addChannelElasticityConstraints(channel, bufGroups);
     }
   }
 
   // Add path and elasticity constraints over all units in the function
   for (Operation &op : funcInfo.funcOp.getOps()) {
-    addUnitPathConstraints(&op, SignalType::DATA);
+    //addUnitPathConstraints(&op, SignalType::DATA);
     addUnitElasticityConstraints(&op);
   }
 

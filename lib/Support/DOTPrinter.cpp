@@ -242,9 +242,9 @@ static std::string getPrettyNodeLabel(Operation *op) {
                     dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
               TimingInfo info = timing.getInfo();
               if (info == TimingInfo::oehb())
-                return "oehb" + numSlotsStr;
+                return getUniqueName(op).str() + numSlotsStr;
               if (info == TimingInfo::tehb())
-                return "tehb" + numSlotsStr;
+                return getUniqueName(op).str() + numSlotsStr;
             }
             return "buffer" + numSlotsStr;
           })
@@ -262,27 +262,28 @@ static std::string getPrettyNodeLabel(Operation *op) {
         StringRef memName = getMemNameForPort(dyn_cast<StoreOpInterface>(op));
         return getMemLabel("ST", memName);
       })
-      .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
-      .Case<handshake::BranchOp>([&](auto) { return "branch"; })
-      .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
-      .Case<handshake::AddIOp, handshake::AddFOp>([&](auto) { return "+"; })
-      .Case<handshake::SubIOp, handshake::SubFOp>([&](auto) { return "-"; })
-      .Case<handshake::AndIOp>([&](auto) { return "&"; })
-      .Case<handshake::OrIOp>([&](auto) { return "|"; })
-      .Case<handshake::XOrIOp>([&](auto) { return "^"; })
-      .Case<handshake::MulIOp, handshake::MulFOp>([&](auto) { return "*"; })
+      .Case<handshake::ControlMergeOp>([&](auto) { return getUniqueName(op); })
+      .Case<handshake::BranchOp>([&](auto) { return getUniqueName(op); })
+      .Case<handshake::ConditionalBranchOp>([&](auto) { return getUniqueName(op); })
+      .Case<handshake::AddIOp, handshake::AddFOp>([&](auto) { return getUniqueName(op); })
+      .Case<handshake::SubIOp, handshake::SubFOp>([&](auto) { return getUniqueName(op); })
+      .Case<handshake::AndIOp>([&](auto) { return getUniqueName(op); })
+      .Case<handshake::OrIOp>([&](auto) { return getUniqueName(op); })
+      .Case<handshake::XOrIOp>([&](auto) { return getUniqueName(op); })
+      .Case<handshake::MulIOp, handshake::MulFOp>([&](auto) { return getUniqueName(op); })
       .Case<handshake::DivUIOp, handshake::DivSIOp, handshake::DivFOp>(
-          [&](auto) { return "div"; })
-      .Case<handshake::ShRSIOp, handshake::ShRUIOp>([&](auto) { return ">>"; })
-      .Case<handshake::ShLIOp>([&](auto) { return "<<"; })
+          [&](auto) { return getUniqueName(op); })
+      .Case<handshake::ShRSIOp, handshake::ShRUIOp>([&](auto) { return getUniqueName(op); })
+      .Case<handshake::ShLIOp>([&](auto) { return getUniqueName(op); })
       .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
           [&](auto) {
-            unsigned opWidth = cast<ChannelType>(op->getOperand(0).getType())
-                                   .getDataBitWidth();
-            unsigned resWidth =
-                cast<ChannelType>(op->getResult(0).getType()).getDataBitWidth();
-            return "[" + std::to_string(opWidth) + "..." +
-                   std::to_string(resWidth) + "]";
+            return getUniqueName(op);
+            // unsigned opWidth = cast<ChannelType>(op->getOperand(0).getType())
+            //                        .getDataBitWidth();
+            // unsigned resWidth =
+            //     cast<ChannelType>(op->getResult(0).getType()).getDataBitWidth();
+            // return "[" + std::to_string(opWidth) + "..." +
+            //        std::to_string(resWidth) + "]";
           })
       .Case<handshake::CmpIOp>([&](handshake::CmpIOp op) {
         switch (op.getPredicate()) {
@@ -338,7 +339,7 @@ static std::string getPrettyNodeLabel(Operation *op) {
         StringRef dialect = op->getDialect()->getNamespace();
         std::string label = op->getName().getStringRef().str();
         label.erase(0, dialect.size() + 1);
-        return label;
+        return getUniqueName(op).str();
       });
 }
 
