@@ -23,6 +23,8 @@
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -232,8 +234,10 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
   addMergeOps(funcOp, rewriter, argReplacements);
   addBranchOps(funcOp, rewriter);
 
+  BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
   LowerFuncToHandshake::MemInterfacesInfo memInfo;
-  if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, memInfo)))
+  if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
+                              memInfo)))
     return failure();
 
   // First round of bb-tagging so that newly inserted Dynamatic memory ports get
@@ -382,6 +386,11 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
   SmallVector<NamedAttribute> attrs = deriveNewAttributes(funcOp);
   auto newFuncOp = rewriter.create<handshake::FuncOp>(
       funcOp.getLoc(), funcOp.getName(), funTy, attrs);
+  if (funcOp.isExternal()) {
+    rewriter.eraseOp(funcOp);
+    return newFuncOp;
+  }
+
   Region *oldBody = &funcOp.getBody();
 
   const TypeConverter *typeConv = getTypeConverter();
@@ -679,6 +688,7 @@ LowerFuncToHandshake::MemAccesses::MemAccesses(BlockArgument memStart)
 LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
     const DenseMap<Value, unsigned> &memrefIndices,
+    BackedgeBuilder &edgeBuilder,
     LowerFuncToHandshake::MemInterfacesInfo &memInfo) const {
   // Count the number of memory regions in the function, and derive the starting
   // index of memory start arguments
@@ -719,13 +729,12 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     Block *block = op.getBlock();
 
     // The memory operation must have a MemInterfaceAttr attribute attached
-    StringRef attrName = handshake::MemInterfaceAttr::getMnemonic();
-    auto memAttr = op.getAttrOfType<handshake::MemInterfaceAttr>(attrName);
-    if (!memAttr)
-      return op.emitError()
-             << "Memory operation must have attribute " << attrName
-             << " of type dynamatic::handshake::MemInterfaceAttr to decide "
-                "which memory interface it should connect to.";
+    auto memAttr = getDialectAttr<handshake::MemInterfaceAttr>(&op);
+    if (!memAttr) {
+      return op.emitError() << "memory operation must have attribute of type "
+                               "'handshake::MemInterfaceAttr' to encode "
+                               "which memory interface it should connect to.";
+    }
     bool connectToMC = memAttr.connectsToMC();
 
     // Replace memref operation with corresponding handshake operation
@@ -734,16 +743,17 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
             .Case<memref::LoadOp>([&](memref::LoadOp loadOp) {
               OperandRange indices = loadOp.getIndices();
               assert(indices.size() == 1 && "load must be unidimensional");
-              MemRefType type = cast<MemRefType>(memref.getType());
 
               Value addr = rewriter.getRemappedValue(indices.front());
               assert(addr && "failed to remap address");
+              Type dataTy = cast<MemRefType>(memref.getType()).getElementType();
+              Value data = edgeBuilder.get(channelifyType(dataTy));
 
               Operation *newOp;
               if (connectToMC)
-                newOp = rewriter.create<handshake::MCLoadOp>(loc, type, addr);
+                newOp = rewriter.create<handshake::MCLoadOp>(loc, addr, data);
               else
-                newOp = rewriter.create<handshake::LSQLoadOp>(loc, type, addr);
+                newOp = rewriter.create<handshake::LSQLoadOp>(loc, addr, data);
 
               // Record the memory access replacement
               memOpLowering.recordReplacement(loadOp, newOp, false);
@@ -1160,21 +1170,35 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   Operation *lookup = modOp.lookupSymbol(symbol);
   if (!lookup)
     return callOp->emitError() << "call references unknown function";
-  auto calledFuncOp = dyn_cast<handshake::FuncOp>(lookup);
-  if (!calledFuncOp)
-    return callOp->emitError() << "call does not reference a function";
-  TypeRange resultTypes = calledFuncOp.getFunctionType().getResults();
+  TypeRange resultTypes;
+  // check if the function is a handshake function
+  auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
+  if (!calledHandshakeFuncOp) {
+    // if this is not the case, the function might have been not traversed yet
+    // during the conversion
+    auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
+    if (!calledFuncOp)
+      return callOp->emitError() << "call does not reference a function";
+    resultTypes = calledFuncOp.getFunctionType().getResults();
+  } else {
+    resultTypes = calledHandshakeFuncOp.getFunctionType().getResults();
+  }
+  SmallVector<Type> handshakeResultTypes;
+  for (auto type : resultTypes)
+    handshakeResultTypes.push_back(channelifyType(type));
+  // add control type to the result types for the end output signal
+  handshakeResultTypes.push_back(
+      handshake::ControlType::get(rewriter.getContext()));
 
-  // Replace the call with the Handshake instance
   rewriter.setInsertionPoint(callOp);
   auto instOp = rewriter.create<handshake::InstanceOp>(
-      callOp.getLoc(), callOp.getCallee(), resultTypes, operands);
+      callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands);
   instOp->setDialectAttrs(callOp->getDialectAttrs());
   namer.replaceOp(callOp, instOp);
   if (callOp->getNumResults() == 0)
     rewriter.eraseOp(callOp);
   else
-    rewriter.replaceOp(callOp, instOp->getResults());
+    rewriter.replaceOp(callOp, instOp.getResults().drop_back());
   return success();
 }
 
@@ -1316,7 +1340,12 @@ struct CfToHandshakePass
                  OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
                  OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
                  OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
-                 OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>>(
+                 OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
+                 OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
+                 OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
+                 OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
+                 OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
+                 OneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
         getAnalysis<NameAnalysis>(), converter, ctx);
 
     // All func-level functions must become handshake-level functions

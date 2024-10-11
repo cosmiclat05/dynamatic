@@ -8,8 +8,19 @@ set-dynamatic-path  .
 # without the extension)
 set-src             integration-test/cnn/cnn.c
 
+<<<<<<< HEAD
 compile 
 write-hdl 
+=======
+# Compile (from source to Handshake IR/DOT)
+# Remove the flag to run smart buffer placement (requires Gurobi)
+compile             --buffer-algorithm on-merges
+
+# Generate the VHDL for the dataflow circuit
+write-hdl
+
+# Simulate using Modelsim
+>>>>>>> upstream/main
 simulate
 synthesize
 

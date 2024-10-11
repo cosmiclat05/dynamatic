@@ -546,7 +546,7 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType,
 }
 
 //===----------------------------------------------------------------------===//
-// Memory interfaces and access ports
+// Memory interfaces
 //===----------------------------------------------------------------------===//
 
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
@@ -602,7 +602,6 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                        I32ArrayAttr:$connectedBlocks);
   let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
 
-  let skipDefaultBuilders = 1;
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
                                  "ArrayRef<unsigned>":$blocks, 
@@ -679,7 +678,6 @@ def LSQOp : Handshake_Op<"lsq", [
   let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes);
   let results = (outs Variadic<HandshakeType>:$outputs);
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs, 
                    "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
@@ -710,19 +708,41 @@ def LSQOp : Handshake_Op<"lsq", [
 
     /// Returns the MC connected to the LSQ, if it exists.
     handshake::MemoryControllerOp getConnectedMC();
+
+    /// Identifies the subset of the control operation's results that are part
+    /// of the control path to the LSQ interface. The control operations'
+    /// results that are not of type `handshake::ControlType` are ignored and
+    /// will never be part of the returned vector. Typically, one would call
+    /// this function on a (lazy-)fork directly providing a group allocation
+    /// signal to the LSQ to inquire about other fork results that would trigger
+    /// other group allocations. As such the method assumed that the IR is
+    /// materialized when called. The returned values are guaranteed to be in
+    /// the same order as the control operation's results.
+    SmallVector<Value> getControlPaths(Operation *ctrlOp);
   }];
 }
 
-class Handshake_LoadOp<string mnemonic> : Handshake_Op<mnemonic, [
-  LoadOpInterface,
-  AllTypesMatch<["address", "addressResult"]>,
-  AllTypesMatch<["data", "dataResult"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
-]> {
+//===----------------------------------------------------------------------===//
+// Memory ports
+//===----------------------------------------------------------------------===//
+
+class Handshake_MemPortOp<string mnemonic, Trait PortInterface> :
+  Handshake_Op<mnemonic, [PortInterface] # [
+    AllTypesMatch<["address", "addressResult"]>,
+    AllTypesMatch<["data", "dataResult"]>,
+    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  ]
+> {
   let arguments = (ins IntChannelType:$address, ChannelType:$data);
   let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
+  let assemblyFormat = [{
+    `[` $address `]` $data attr-dict `:` type($address) `,` type($data)
+  }];
+}
+
+class Handshake_LoadOp<string mnemonic> :
+  Handshake_MemPortOp<mnemonic, LoadOpInterface> {
   let builders = [OpBuilder<(ins "MemRefType":$memrefType, "Value":$address)>];
-  let assemblyFormat = "`[` $address `]` $data attr-dict `:` type($address) `,` type($data)";
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
@@ -733,6 +753,19 @@ class Handshake_LoadOp<string mnemonic> : Handshake_Op<mnemonic, [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
+    }
+  }];
+}
+
+class Handshake_StoreOp<string mnemonic> :
+  Handshake_MemPortOp<mnemonic, StoreOpInterface> {
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned int idx) {
+      return (idx == 0) ? "addrIn" : "dataIn";
+    }
+
+    std::string $cppClass::getResultName(unsigned int idx) {
+      return (idx == 0) ? "addrOut" : "dataToMem";
     }
   }];
 }
@@ -758,8 +791,7 @@ def MCLoadOp : Handshake_LoadOp<"mc_load"> {
     Example:
 
     ```mlir
-    %addrToMem, %dataToSucc = mc_load [%addrFromPred] %dataFromMem :
-      !handshake.channel<i32>, !handshake.channel<i32>
+    %addrOut, %dataOut = mc_load [%addrIn] %dataFromMem : <i32>, <i32>
     ```
   }];
 }
@@ -784,30 +816,8 @@ def LSQLoadOp : Handshake_LoadOp<"lsq_load"> {
     Example:
 
     ```mlir
-    %addrToMem, %dataToSucc = lsq_load [%addrFromPred] %dataFromMem :
-      !handshake.channel<i32>, !handshake.channel<i32>
+    %addrOut, %dataOut = lsq_load [%addrIn] %dataFromMem : <i32>, <i32>
     ```
-  }];
-}
-
-class Handshake_StoreOp<string mnemonic> : Handshake_Op<mnemonic, [
-  StoreOpInterface,
-  AllTypesMatch<["address", "addressResult"]>,
-  AllTypesMatch<["data", "dataResult"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
-]> {
-  let arguments = (ins IntChannelType:$address, ChannelType:$data);
-  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
-  let assemblyFormat = "`[` $address `]` $data attr-dict `:` type($data) `,` type($address)";
-
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned int idx) {
-      return (idx == 0) ? "addrIn" : "dataIn";
-    }
-
-    std::string $cppClass::getResultName(unsigned int idx) {
-      return (idx == 0) ? "addrOut" : "dataToMem";
-    }
   }];
 }
 
@@ -829,9 +839,9 @@ def MCStoreOp : Handshake_StoreOp<"mc_store"> {
     2. data value (to memory interface)
 
     Example:
+
     ```mlir
-    %addrToMem, %dataToMem = mc_store [%addrFromPred] %dataFromPred :
-      !handshake.channel<i32>, !handshake.channel<i32>
+    %addrOut, %dataToMem = mc_load [%addrIn] %dataIn : <i32>, <i32>
     ```
   }];
 }
@@ -853,12 +863,16 @@ def LSQStoreOp : Handshake_StoreOp<"lsq_store"> {
     2. data value (to memory interface)
 
     Example:
+
     ```mlir
-    %addrToMem, %dataToMem = lsq_store [%addrFromPred] %dataFromPred :
-      !handshake.channel<i32>, !handshake.channel<i32>
+    %addrOut, %dataToMem = lsq_load [%addrIn] %dataIn : <i32>, <i32>
     ```
   }];
 }
+
+//===----------------------------------------------------------------------===//
+// Terminator
+//===----------------------------------------------------------------------===//
 
 def EndOp : Handshake_Op<"end", [
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
@@ -915,8 +929,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     ```
   }];
 
-  let arguments = (ins ChannelType:$dataIn, ControlType:$enable);
-  let results = (outs ChannelType:$dataOut,
+  let arguments = (ins HandshakeType:$dataIn, ControlType:$enable);
+  let results = (outs HandshakeType:$dataOut,
                       BoolChannel:$saveCtrl, BoolChannel:$commitCtrl, 
                       IntSizedChannel<3>:$SCSaveCtrl,
                       IntSizedChannel<3>:$SCCommitCtrl, 
@@ -929,8 +943,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
   SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>
 ]> {
-  let arguments = (ins ChannelType:$dataIn, BoolChannel:$ctrl);
-  let results = (outs ChannelType:$dataOut);
+  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
   }];
@@ -992,6 +1006,7 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
     %dataOut = spec_save_commit[%ctrl] %dataIn : i11
     ```
   }];
+  let arguments = (ins HandshakeType:$dataIn, IntSizedChannel<3>:$ctrl);
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
@@ -1015,8 +1030,8 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     ```
   }];
 
-  let arguments = (ins BoolChannel:$tagFromOperand, ChannelType:$dataOperand);
-  let results = (outs ChannelType:$trueResult, ChannelType:$falseResult);
+  let arguments = (ins HandshakeType:$tagFromOperand, HandshakeType:$dataOperand);
+  let results = (outs HandshakeType:$trueResult, HandshakeType:$falseResult);
   let assemblyFormat = [{
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
       type($tagFromOperand) `,` type($dataOperand)
@@ -1028,19 +1043,51 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
 //===----------------------------------------------------------------------===//
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
-  SameOperandsAndResultType
+  SameOperandsAndResultType, 
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
 ]> {
+
   let summary = "sharing wrapper operation";
   let description = [{
-    The sharing_wrapper operation represents the selecting & distributing logic
-    that wraps around a functional unit.
-  }];
+    The sharing_wrapper operation represents the selecting & distributing logic 
+    that manages access to a shared unit.
+    
+    The sharing wrapper interfaces with the shared unit and the rest of the
+    circuit.
 
-  let arguments = (ins Variadic<ChannelType>:$dataOperands,
-                       ChannelType:$sharedOpResult,
-                       DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
-                       ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands);
-  let results = (outs Variadic<ChannelType>:$dataOut);
+    Attributes:
+    - $credits: an array of integers that indicates, each integer indicates the
+      maximum number of in-flight accesses in the shared resource of one
+      operation that share the unit.
+    - $numSharedOperands: the number of operands of the shared unit.
+    - $latency: the execution latency of the shared unit.
+    
+    The convention for the input operands:
+    - the first "numSharedOperands * len(credits)" operands are the operands
+      from the circuit
+    - the last operand is the result computed by the shared unit
+    
+    The convention for the output results:
+    - the first "len(credits)" results are results dispatched to the rest of the
+      circuit
+    - the last "numSharedOperands" result is the selected operands that will be
+      delivered to the shared unit.
+    
+    Future improvement:
+    - Add the number of operations that share the unit (now it is assumed to be
+      the size of the DenseI64ArrayAttr credits).
+    - More verbose separations between the operands/results that interface with
+      the rest of the circuit or interface with the shared unit (i.e., add a
+      custom interface printing for different operand/result types).
+    }];
+
+  let arguments = (ins Variadic<ChannelType> : $dataOperands,
+    ChannelType : $sharedOpResult,
+    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
+    ConfinedAttr<I32Attr, [IntMinValue<2>]>:$numSharedOperations,
+    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands,
+    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
+  let results = (outs Variadic<ChannelType> : $dataOut);
 
   let assemblyFormat = [{
     `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:`

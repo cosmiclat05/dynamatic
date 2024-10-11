@@ -72,10 +72,10 @@ module mem_controller_loadless #(
   assign ctrl_ready   = {NUM_CONTROLS{1'b1}};
 
   integer          i;
-  reg     [31 : 0] counter;
+  reg     [31 : 0] counter = 32'd0;
 
   // Counting Stores
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       counter = 32'd0;
     end else begin

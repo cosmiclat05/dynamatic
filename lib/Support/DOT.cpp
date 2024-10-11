@@ -1,4 +1,4 @@
-//===- DOTPrinter.cpp - Print DOT to standard output ------------*- C++ -*-===//
+//===- DOT.cpp - Graphviz's DOT format support ------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,30 +12,405 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/DOTPrinter.h"
+#include "dynamatic/Support/DOT.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/Speculation/SpecAnnotatePaths.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <cctype>
+#include <cstdio>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <utility>
 
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+
+DOTGraph::Builder DOTGraph::getBuilder() { return Builder(*this); }
+
+SmallVector<const DOTGraph::Edge *>
+DOTGraph::getAdjacentEdges(const Node &node) const {
+  SmallVector<const Edge *> adjacentEdges;
+  const Node *nodeAddr = &node;
+  for (const Edge *edge : edges) {
+    if (edge->srcNode == nodeAddr || edge->dstNode == nodeAddr)
+      adjacentEdges.push_back(edge);
+  }
+  return adjacentEdges;
+}
+
+DOTGraph::~DOTGraph() {
+  for (Node *n : nodes)
+    delete n;
+  for (Edge *e : edges)
+    delete e;
+}
+
+FailureOr<DOTGraph::Node *>
+DOTGraph::Builder::addNode(StringRef id, DOTGraph::Subgraph *subgraph) {
+  DOTGraph::Node *node;
+  if (auto it = graph.nodesByID.find(id); it != graph.nodesByID.end()) {
+    // This is fine as long as the node was added through an earlier edge
+    if (!earlyNodes.erase(id)) {
+      llvm::errs() << "Duplicate node with ID '" << id << "'\n";
+      return failure();
+    }
+    node = it->second;
+  } else {
+    node = graph.nodes.emplace_back(new DOTGraph::Node(id));
+    graph.nodesByID.insert({node->id, node});
+  }
+
+  if (subgraph)
+    subgraph->nodes.insert(node);
+  return node;
+}
+
+DOTGraph::Edge *DOTGraph::Builder::addEdge(StringRef srcID, StringRef dstID,
+                                           DOTGraph::Subgraph *subgraph) {
+  const DOTGraph::Node *srcNode = getOrAddNode(srcID);
+  const DOTGraph::Node *dstNode = getOrAddNode(dstID);
+  DOTGraph::Edge *edge =
+      graph.edges.emplace_back(new DOTGraph::Edge(srcNode, dstNode));
+  graph.successors[srcNode].push_back(edge);
+  if (subgraph)
+    subgraph->edges.insert(edge);
+  return edge;
+}
+
+DOTGraph::Subgraph *DOTGraph::Builder::addSubgraph(StringRef id,
+                                                   Subgraph *subgraph) {
+  if (subgraph)
+    return &subgraph->subgraphs.emplace_back(id);
+  return &graph.subgraphs.emplace_back(id);
+}
+
+DOTGraph::Node *DOTGraph::Builder::getOrAddNode(StringRef id) {
+  auto srcNodeIt = graph.nodesByID.find(id.str());
+  if (srcNodeIt != graph.nodesByID.end())
+    return srcNodeIt->second;
+
+  earlyNodes.insert(id);
+  return *addNode(id);
+}
+
+LogicalResult DOTGraph::Builder::parseFromFile(StringRef filepath) {
+  Parser parser(graph, filepath);
+  if (parser)
+    return parser.emitError(filepath);
+  return success();
+}
+
+DOTGraph::Parser::Parser(DOTGraph &graph, StringRef filepath) : Builder(graph) {
+  if (failed(tokenize(filepath)))
+    return;
+  if (parseLiteral("digraph") || parseID(&graph.id) || parseLiteral("{") ||
+      parseStatementList() || parseLiteral("}"))
+    return;
+  parsingFailed = false;
+}
+
+LogicalResult DOTGraph::Parser::emitError(StringRef filepath) const {
+  assert(error && "no error to emit");
+  const Token &tok = tokens[std::min(tokens.size() - 1, tokenIdx)];
+  llvm::errs() << "Failed to parse graph @ \"" << filepath << "\", on token '"
+               << tok.tok << "':" << tok.line << ":" << tok.pos << "\n";
+  if (error)
+    llvm::errs() << "\t" << *error << "\n";
+  return failure();
+}
+
+ParseResult DOTGraph::Parser::parseStatementList() {
+  if (!parseOptionalStatement()) {
+    parseOptionalLiteral(";");
+    return parseStatementList();
+  }
+  return success();
+}
+
+ParseResult DOTGraph::Parser::parseStatement() {
+  auto &attr = currentSubgraph ? currentSubgraph->attributes : graph.attributes;
+
+  std::string id;
+  if (parseID(&id))
+    return setError("expected statement to start with valid ID");
+
+  // First check for all strings that indicate a "special kind of statement"
+  if (id == "graph")
+    return parseAttrList(&attr);
+
+  if (id == "node" || id == "edge") {
+    // Just parse the attributes and drop them immediately after, we don't
+    // support this syntax
+    DOTGraph::Attributes attributes;
+    return parseAttrList(&attributes);
+  }
+  if (id == "subgraph") {
+    std::string subgraph;
+    parseOptionalID(&subgraph);
+    Subgraph *oldSubgraph = currentSubgraph;
+    currentSubgraph = addSubgraph(subgraph, currentSubgraph);
+    if (parseLiteral("{") || parseStatementList() || parseLiteral("}"))
+      return setError("failed to parse subgraph body");
+    currentSubgraph = oldSubgraph;
+    return success();
+  }
+
+  DOTGraph::Attributes *nodeOrEdgeAttr;
+  if (parseOptionalLiteral("->")) {
+    // This is a node
+    FailureOr<DOTGraph::Node *> node = addNode(id, currentSubgraph);
+    if (failed(node))
+      return setError("failed to add node to the graph");
+    nodeOrEdgeAttr = &(*node)->attributes;
+  } else {
+    // This is an edge
+    std::string dstNodeID;
+    if (parseID(&dstNodeID))
+      return setError("failed to parse edge destination node ID");
+
+    Edge *edge = addEdge(id, dstNodeID, currentSubgraph);
+    nodeOrEdgeAttr = &edge->attributes;
+  }
+  parseOptionalAttrList(nodeOrEdgeAttr);
+  return success();
+}
+
+ParseResult DOTGraph::Parser::parseAttrList(DOTGraph::Attributes *attr) {
+  if (parseLiteral("["))
+    return setError("expected '[' at beginning of attribute list");
+  parseOptionalInnerAttrList(attr);
+  if (parseLiteral("]"))
+    return setError("expected ']' at end of attribute list");
+  parseOptionalAttrList(attr);
+  return success();
+}
+
+ParseResult DOTGraph::Parser::parseInnerAttrList(DOTGraph::Attributes *attr) {
+  std::string lhs, rhs;
+  if (parseID(&lhs) || parseLiteral("=") || parseID(&rhs))
+    return setError("expected 'lhs = rhs' attribute form");
+  attr->insert_or_assign(lhs, rhs);
+  if (parseOptionalLiteral(";"))
+    parseOptionalLiteral(",");
+  parseOptionalInnerAttrList(attr);
+  return success();
+}
+
+ParseResult DOTGraph::Parser::parseLiteral(StringRef literal) {
+  if (tokens[tokenIdx++].tok != literal)
+    return setError("expected token to be specific literal");
+  return success();
+}
+
+ParseResult DOTGraph::Parser::parseID(std::string *id) {
+  StringRef tokenRef(tokens[tokenIdx++].tok);
+
+  // Check for alphanumeric string (and underscore) not starting with a digit
+  if (llvm::all_of(tokenRef,
+                   [](char c) { return llvm::isAlnum(c) || c == '_'; }) &&
+      !llvm::isDigit(tokenRef.front())) {
+    *id = tokenRef;
+    return success();
+  }
+
+  // Check for double-quoted string (possible escaped quotes taken care of by
+  // tokenization logic)
+  if (tokenRef.front() == '"') {
+    assert(tokenRef.back() == '"' && "unbalanced quoted string");
+    *id = tokenRef.drop_front().drop_back().str();
+    return success();
+  }
+
+  // Check for numeral [-]?(.[0-9]⁺ | [0-9]⁺(.[0-9]*)?)
+  bool firstChar = true;
+  bool decimalDigits = false;
+  bool integerDigits = false;
+  for (char c : tokenRef) {
+    if (firstChar) {
+      firstChar = false;
+      if (c == '.') {
+        decimalDigits = true;
+      } else if (c == '-' || llvm::isDigit(c)) {
+        integerDigits = true;
+      } else {
+        return setError("numeral ID should start with '.', '-', or a digit");
+      }
+    } else {
+      if (decimalDigits) {
+        if (!llvm::isDigit(c))
+          return setError("numeral should only contain digits after '.'");
+      }
+      if (integerDigits) {
+        if (c == '.') {
+          integerDigits = false;
+          decimalDigits = true;
+        } else if (!llvm::isDigit(c)) {
+          return setError("numeral should only contain digits before '.'");
+        }
+      }
+    }
+  }
+  *id = tokenRef;
+  return success();
+}
+
+ParseResult DOTGraph::Parser::tokenize(StringRef filepath) {
+  static const std::set<char> symbols = {'{', '}', '[', ']',
+                                         '=', ':', ';', ','};
+
+  std::ifstream file(filepath.str());
+  if (!file.is_open()) {
+    llvm::errs() << "Failed to open DOT file @ \"" << filepath << "\"\n";
+    return failure();
+  }
+
+  size_t lineNum = 0;
+  auto error = [&](const llvm::Twine &msg) {
+    llvm::errs() << "On line " << lineNum << ": " << msg << "\n";
+    return failure();
+  };
+
+  std::string line;
+  size_t idx = 0;
+  auto getLine = [&]() -> bool {
+    if (!std::getline(file, line))
+      return false;
+    idx = 0;
+    ++lineNum;
+    return true;
+  };
+
+  using FNextToken = std::function<FailureOr<Token>()>;
+  FNextToken nextToken = [&]() -> FailureOr<Token> {
+    while (idx == line.size()) {
+      if (!getLine())
+        return Token(0, 0);
+    }
+
+    // Discard leading whitespaces
+    for (; idx < line.size(); ++idx) {
+      char c = line[idx];
+      if (!isspace(c))
+        break;
+    }
+    if (idx == line.size()) {
+      // This is a completely empty line, just skip it
+      return nextToken();
+    }
+
+    Token token(lineNum, idx);
+
+    // Read character by character until we finish the line (look over next
+    // lines for quoted strings with backslashes at the end)
+    std::stringstream ss;
+    bool quoted = false;
+    bool escaped = false;
+    do {
+      escaped = false;
+      for (; idx < line.size(); ++idx) {
+        char c = line[idx];
+        if (escaped) {
+          if (c != '"')
+            ss << '\\';
+          escaped = false;
+          ss << c;
+          continue;
+        }
+
+        if (quoted) {
+          if (c == '\\') {
+            escaped = true;
+          } else {
+            ss << c;
+            if (c == '"') {
+              token.tok = ss.str();
+              ++idx;
+              return token;
+            }
+          }
+        } else {
+          if (c == '"') {
+            quoted = true;
+            ss << c;
+            continue;
+          }
+          if (symbols.find(c) != symbols.end()) {
+            token.tok = ss.str();
+            if (token.tok.empty()) {
+              ++idx;
+              token.tok = c;
+              return token;
+            }
+            // Don't increment the index so that the next character to be
+            // parsed will be the symbol
+            return token;
+          }
+          // Detect edge symbol
+          if (c == '-' && idx < line.size() - 1 && line[idx + 1] == '>') {
+            token.tok = ss.str();
+            if (token.tok.empty()) {
+              idx += 2;
+              token.tok = "->";
+              return token;
+            }
+            // Don't increment the index so that the next character to be
+            // parsed will be the symbol
+            return token;
+          }
+          if (isspace(c)) {
+            ++idx;
+            token.tok = ss.str();
+            return token;
+          }
+          if (!llvm::isAlnum(c) && c != '_' && c != '.' && c != '-') {
+            return error("unquoted string can only contain alphanumeric "
+                         "characters or underscores");
+          }
+          ss << c;
+        }
+      }
+    } while (escaped && quoted && getLine());
+
+    if (quoted)
+      return error("unfinished quoted string");
+    token.tok = ss.str();
+    return token;
+  };
+
+  while (true) {
+    FailureOr<Token> token = nextToken();
+    if (failed(token))
+      return failure();
+    if (token->tok.empty())
+      return success();
+    tokens.push_back(*token);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// DOTPrinter
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -46,80 +421,10 @@ using PortsData = std::vector<std::pair<std::string, Value>>;
 using MemPortsData = std::vector<std::tuple<std::string, Value, std::string>>;
 /// In legacy mode, a port represented with a unique name and a bitwidth
 using RawPort = std::pair<std::string, unsigned>;
+/// Output stream type.
+using OS = mlir::raw_indented_ostream;
 
 } // namespace
-
-// ============================================================================
-// Legacy node/edge attributes
-// ============================================================================
-
-/// Maps name of arith/math operations to "op" attribute.
-static llvm::StringMap<StringRef> compNameToOpName{
-    {handshake::AddFOp::getOperationName(), "fadd_op"},
-    {handshake::AddIOp::getOperationName(), "add_op"},
-    {handshake::AndIOp::getOperationName(), "and_op"},
-    {handshake::DivFOp::getOperationName(), "fdiv_op"},
-    {handshake::DivSIOp::getOperationName(), "sdiv_op"},
-    {handshake::DivUIOp::getOperationName(), "udiv_op"},
-    {handshake::ExtSIOp::getOperationName(), "sext_op"},
-    {handshake::ExtUIOp::getOperationName(), "zext_op"},
-    {handshake::MulFOp::getOperationName(), "fmul_op"},
-    {handshake::MulIOp::getOperationName(), "mul_op"},
-    {handshake::OrIOp::getOperationName(), "or_op"},
-    {handshake::SelectOp::getOperationName(), "select_op"},
-    {handshake::ShLIOp::getOperationName(), "shl_op"},
-    {handshake::SubIOp::getOperationName(), "sub_op"},
-    {handshake::SubFOp::getOperationName(), "fsub_op"},
-    {handshake::ShRSIOp::getOperationName(), "ashr_op"},
-    {handshake::TruncIOp::getOperationName(), "trunc_op"},
-    {handshake::XOrIOp::getOperationName(), "xor_op"},
-    {math::CosOp::getOperationName(), "cosf_op"},
-    {math::ExpOp::getOperationName(), "expf_op"},
-    {math::Exp2Op::getOperationName(), "exp2f_op"},
-    {math::LogOp::getOperationName(), "logf_op"},
-    {math::Log2Op::getOperationName(), "log2f_op"},
-    {math::Log10Op::getOperationName(), "log10f_op"},
-    {math::SinOp::getOperationName(), "sinf_op"},
-    {math::SqrtOp::getOperationName(), "sqrtf_op"},
-};
-
-/// Maps name of integer comparison type to "op" attribute.
-static DenseMap<handshake::CmpIPredicate, StringRef> cmpINameToOpName{
-    {handshake::CmpIPredicate::eq, "icmp_eq_op"},
-    {handshake::CmpIPredicate::ne, "icmp_ne_op"},
-    {handshake::CmpIPredicate::slt, "icmp_slt_op"},
-    {handshake::CmpIPredicate::sle, "icmp_sle_op"},
-    {handshake::CmpIPredicate::sgt, "icmp_sgt_op"},
-    {handshake::CmpIPredicate::sge, "icmp_sge_op"},
-    {handshake::CmpIPredicate::ult, "icmp_ult_op"},
-    {handshake::CmpIPredicate::ule, "icmp_ule_op"},
-    {handshake::CmpIPredicate::ugt, "icmp_ugt_op"},
-    {handshake::CmpIPredicate::uge, "icmp_uge_op"},
-};
-
-/// Maps name of floating-point comparison type to "op" attribute.
-static DenseMap<handshake::CmpFPredicate, StringRef> cmpFNameToOpName{
-    {handshake::CmpFPredicate::AlwaysFalse, "fcmp_false_op"},
-    {handshake::CmpFPredicate::OEQ, "fcmp_oeq_op"},
-    {handshake::CmpFPredicate::OGT, "fcmp_ogt_op"},
-    {handshake::CmpFPredicate::OGE, "fcmp_oge_op"},
-    {handshake::CmpFPredicate::OLT, "fcmp_olt_op"},
-    {handshake::CmpFPredicate::OLE, "fcmp_ole_op"},
-    {handshake::CmpFPredicate::ONE, "fcmp_one_op"},
-    {handshake::CmpFPredicate::ORD, "fcmp_orq_op"},
-    {handshake::CmpFPredicate::UEQ, "fcmp_ueq_op"},
-    {handshake::CmpFPredicate::UGT, "fcmp_ugt_op"},
-    {handshake::CmpFPredicate::UGE, "fcmp_uge_op"},
-    {handshake::CmpFPredicate::ULT, "fcmp_ult_op"},
-    {handshake::CmpFPredicate::ULE, "fcmp_ule_op"},
-    {handshake::CmpFPredicate::UNE, "fcmp_une_op"},
-    {handshake::CmpFPredicate::UNO, "fcmp_uno_op"},
-    {handshake::CmpFPredicate::AlwaysTrue, "fcmp_true_op"},
-};
-
-// ============================================================================
-// Printing
-// ============================================================================
 
 static constexpr StringLiteral DOTTED("dotted"), SOLID("solid"), DOT("dot"),
     NORMAL("normal");
@@ -364,66 +669,50 @@ static StringRef getNodeColor(Operation *op) {
 
 DOTPrinter::DOTPrinter(EdgeStyle edgeStyle) : edgeStyle(edgeStyle) {}
 
-LogicalResult DOTPrinter::print(mlir::ModuleOp mod,
-                                mlir::raw_indented_ostream *os) {
+LogicalResult DOTPrinter::write(mlir::ModuleOp modOp, OS &os) {
   // We support at most one function per module
-  auto funcs = mod.getOps<handshake::FuncOp>();
+  auto funcs = modOp.getOps<handshake::FuncOp>();
   if (funcs.empty())
     return success();
 
   // We only support one function per module
   handshake::FuncOp funcOp = nullptr;
-  for (auto op : mod.getOps<handshake::FuncOp>()) {
+  for (auto op : modOp.getOps<handshake::FuncOp>()) {
     if (op.isExternal())
       continue;
     if (funcOp) {
-      return mod->emitOpError() << "we currently only support one non-external "
-                                   "handshake function per module";
+      return modOp->emitOpError()
+             << "we currently only support one non-external "
+                "handshake function per module";
     }
     funcOp = op;
   }
 
   // Name all operations in the IR
-  NameAnalysis nameAnalysis = NameAnalysis(mod);
+  NameAnalysis nameAnalysis = NameAnalysis(modOp);
   if (!nameAnalysis.isAnalysisValid())
     return failure();
   nameAnalysis.nameAllUnnamedOps();
 
   // Print the graph
-  if (os)
-    return printFunc(funcOp, *os);
-  mlir::raw_indented_ostream stdOs(llvm::outs());
-  return printFunc(funcOp, stdOs);
+  writeFunc(funcOp, os);
+  return success();
 }
 
-std::string DOTPrinter::getArgumentName(handshake::FuncOp funcOp, size_t idx) {
-  auto numArgs = funcOp.getNumArguments();
-  assert(idx < numArgs && "argument index too high");
-  return funcOp.getArgName(idx).getValue().str();
-}
-
-std::string DOTPrinter::getResultName(handshake::FuncOp funcOp, size_t idx) {
-  auto numResults = funcOp.getFunctionType().getNumResults();
-  assert(idx < numResults && "result index too high");
-  return funcOp.getResName(idx).getValue().str();
-}
-
-void DOTPrinter::openSubgraph(std::string &name, std::string &label,
-                              mlir::raw_indented_ostream &os) {
+void DOTPrinter::openSubgraph(StringRef name, StringRef label, OS &os) {
   os << "subgraph \"" << name << "\" {\n";
   os.indent();
   os << "label=\"" << label << "\"\n";
 }
 
-void DOTPrinter::closeSubgraph(mlir::raw_indented_ostream &os) {
+void DOTPrinter::closeSubgraph(OS &os) {
   os.unindent();
   os << "}\n";
 }
 
-LogicalResult DOTPrinter::printNode(Operation *op,
-                                    mlir::raw_indented_ostream &os) {
+void DOTPrinter::writeNode(Operation *op, OS &os) {
   if (isa<handshake::EndOp>(op))
-    return success();
+    return;
 
   // The node's DOT name
   std::string opName = getUniqueName(op).str();
@@ -453,37 +742,52 @@ LogicalResult DOTPrinter::printNode(Operation *op,
      << " [mlir_op=\"" << mlirOpName << "\", label=\"" << prettyLabel
      << "\", fillcolor=" << getNodeColor(op) << ", shape=\"" << shape
      << "\", style=\"" << style << "\"]\n";
-  return success();
 }
 
-LogicalResult DOTPrinter::printEdge(OpOperand &oprd,
-                                    mlir::raw_indented_ostream &os) {
+void DOTPrinter::writeEdge(OpOperand &oprd, const PortNames &portNames,
+                           OS &os) {
   Value val = oprd.get();
-  Operation *src = val.getDefiningOp();
-  Operation *dst = oprd.getOwner();
+  Operation *dstOp = oprd.getOwner();
 
-  std::string srcNodeName = getUniqueName(src).str();
-  std::string dstNodeName;
-  if (isa<handshake::EndOp>(dst)) {
-    dstNodeName = getResultName(dst->getParentOfType<handshake::FuncOp>(),
-                                oprd.getOperandNumber());
+  // Determine the edge's source
+  std::string srcNodeName, srcPortName;
+  unsigned srcIdx;
+  if (auto res = dyn_cast<OpResult>(val)) {
+    Operation *srcOp = res.getDefiningOp();
+    srcNodeName = getUniqueName(srcOp).str();
+    srcIdx = res.getResultNumber();
+    srcPortName = portNames.at(srcOp).getOutputName(srcIdx);
   } else {
-    dstNodeName = getUniqueName(dst).str();
+    Operation *parentOp = val.getParentBlock()->getParentOp();
+    srcIdx = cast<BlockArgument>(val).getArgNumber();
+    srcNodeName = srcPortName = portNames.at(parentOp).getInputName(srcIdx);
   }
 
-  os << "\"" << srcNodeName << "\" -> \"" << dstNodeName << "\" ["
-     << getEdgeStyle(oprd);
-  if (isBackedge(val, dst))
+  // Determine the edge's destination
+  std::string dstNodeName, dstPortName;
+  unsigned dstIdx;
+  if (isa<handshake::EndOp>(dstOp)) {
+    Operation *parentOp = dstOp->getParentOp();
+    dstIdx = oprd.getOperandNumber();
+    dstNodeName = dstPortName = portNames.at(parentOp).getOutputName(dstIdx);
+  } else {
+    dstNodeName = getUniqueName(dstOp).str();
+    dstIdx = oprd.getOperandNumber();
+    dstPortName = portNames.at(dstOp).getInputName(dstIdx);
+  }
+
+  os << "\"" << srcNodeName << "\" -> \"" << dstNodeName << "\" [from=\""
+     << srcPortName << "\", from_idx=\"" << srcIdx << "\" to=\"" << dstPortName
+     << "\", to_idx=\"" << dstIdx << "\", " << getEdgeStyle(oprd);
+  if (isBackedge(val, dstOp))
     os << " color=\"blue\"";
   // Print speculative edge attribute
   if (experimental::speculation::isSpeculative(oprd, true))
-    os << ((isBackedge(val, dst)) ? ", " : "") << " speculative=1";
+    os << ((isBackedge(val, dstOp)) ? ", " : "") << " speculative=1";
   os << "]\n";
-  return success();
 }
 
-LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
-                                    mlir::raw_indented_ostream &os) {
+void DOTPrinter::writeFunc(handshake::FuncOp funcOp, OS &os) {
   std::string splines;
   if (edgeStyle == EdgeStyle::SPLINE)
     splines = "spline";
@@ -492,8 +796,13 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
 
   os << "Digraph G {\n";
   os.indent();
-  os << "splines=" << splines << ";\n";
-  os << "compound=true; // Allow edges between clusters\n";
+  os << "splines=" << splines << "\ncompound=true\n";
+
+  // Collect port names for all operations and the top-level function
+  PortNames portNames;
+  portNames.try_emplace(funcOp, funcOp);
+  for (Operation &op : funcOp.getOps())
+    portNames.try_emplace(&op, &op);
 
   // Function arguments do not belong to any basic block
   os << "// Function arguments\n";
@@ -503,7 +812,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
       // inside the function so they are not displayed
       continue;
 
-    std::string argLabel = getArgumentName(funcOp, idx);
+    StringRef argLabel = portNames.at(funcOp).getInputName(idx);
     os << "\"" << argLabel << R"(" [mlir_op="handshake.func", shape=diamond, )"
        << "label=\"" << argLabel << "\", style=\"" << getStyle(arg) << "\"]\n";
   }
@@ -512,7 +821,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   os << "// Function results\n";
   ValueRange results = funcOp.getBodyBlock()->getTerminator()->getOperands();
   for (const auto &[idx, res] : llvm::enumerate(results)) {
-    std::string resLabel = getResultName(funcOp, idx);
+    StringRef resLabel = portNames.at(funcOp).getOutputName(idx);
     os << "\"" << resLabel << R"(" [mlir_op="handshake.func", shape=diamond, )"
        << "label=\"" << resLabel << "\", style=\"" << getStyle(res) << "\"]\n";
   }
@@ -531,14 +840,12 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
     // Open the subgraph
     os << "// Units/Channels in BB " << blockID << "\n";
     std::string graphName = "cluster" + std::to_string(blockID);
-    std::string graphLabel = "block" + std::to_string(blockID);
+    std::string graphLabel = "BB " + std::to_string(blockID);
     openSubgraph(graphName, graphLabel, os);
 
     os << "// Units in BB " << blockID << "\n";
-    for (Operation *op : blockOps) {
-      if (failed(printNode(op, os)))
-        return failure();
-    }
+    for (Operation *op : blockOps)
+      writeNode(op, os);
 
     os << "// Channels in BB " << blockID << "\n";
     for (Operation *op : blockOps) {
@@ -546,12 +853,10 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
         for (OpOperand &oprd : res.getUses()) {
           Operation *userOp = oprd.getOwner();
           std::optional<unsigned> bb = getLogicBB(userOp);
-          if (bb && *bb == blockID && !isa<handshake::EndOp>(userOp)) {
-            if (failed(printEdge(oprd, os)))
-              return failure();
-          } else {
+          if (bb && *bb == blockID && !isa<handshake::EndOp>(userOp))
+            writeEdge(oprd, portNames, os);
+          else
             outgoingEdges[blockID].push_back(&oprd);
-          }
         }
       }
     }
@@ -561,73 +866,33 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   }
 
   os << "// Units outside of all basic blocks\n";
-  for (Operation *op : blocks.outOfBlocks) {
-    if (failed(printNode(op, os)))
-      return failure();
-  }
+  for (Operation *op : blocks.outOfBlocks)
+    writeNode(op, os);
 
   // Print edges coming from function arguments if they haven't been so far
   os << "// Channels from function arguments\n";
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
     if (isa<MemRefType>(arg.getType()))
       continue;
-
-    for (OpOperand &oprd : arg.getUses()) {
-      Operation *ownerOp = oprd.getOwner();
-      std::string argLabel = getArgumentName(funcOp, idx);
-      os << "\"" << argLabel << "\" -> \"" << getUniqueName(ownerOp) << "\" ["
-         << getEdgeStyle(oprd) << "]\n";
-    }
+    for (OpOperand &oprd : arg.getUses())
+      writeEdge(oprd, portNames, os);
   }
 
   // Print outgoing edges for each block
   for (auto &[blockID, blockEdges] : outgoingEdges) {
     os << "// Channels outgoing of BB " << blockID << "\n";
-    for (OpOperand *oprd : blockEdges) {
-      if (failed(printEdge(*oprd, os)))
-        return failure();
-    }
+    for (OpOperand *oprd : blockEdges)
+      writeEdge(*oprd, portNames, os);
   }
 
   os << "// Channels outside of all basic blocks\n";
   for (Operation *op : blocks.outOfBlocks) {
     for (OpResult res : op->getResults()) {
-      for (OpOperand &oprd : res.getUses()) {
-        if (failed(printEdge(oprd, os)))
-          return failure();
-      }
+      for (OpOperand &oprd : res.getUses())
+        writeEdge(oprd, portNames, os);
     }
   }
+
   os.unindent();
   os << "}\n";
-  return success();
-}
-
-void DOTNode::print(mlir::raw_indented_ostream &os) {
-  // Print type
-  os << "type=\"" << type << "\"";
-  if (!stringAttr.empty() || !intAttr.empty())
-    os << ", ";
-
-  // Print all attributes
-  for (auto [idx, attr] : llvm::enumerate(stringAttr)) {
-    auto &[name, value] = attr;
-    os << name << "=\"" << value << "\"";
-    if (idx != stringAttr.size() - 1)
-      os << ", ";
-  }
-  if (!intAttr.empty())
-    os << ", ";
-  for (auto [idx, attr] : llvm::enumerate(intAttr)) {
-    auto &[name, value] = attr;
-    os << name << "=" << value;
-    if (idx != intAttr.size() - 1)
-      os << ", ";
-  }
-}
-
-void DOTEdge::print(mlir::raw_indented_ostream &os) {
-  os << "from=\"out" << from << "\", to=\"in" << to << "\"";
-  if (memAddress.has_value())
-    os << ", mem_address=\"" << (memAddress.value() ? "true" : "false") << "\"";
 }

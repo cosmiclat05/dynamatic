@@ -109,6 +109,24 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
+def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
+  let summary = "Analyzes memory accesses to LSQs to find unnecessary ones";
+  let description = [{
+    Performs flow analysis to identify WAR dependencies between memory accesses
+    that are ensured by the circuit's semantics and which therefore do not need
+    to be enforced by an LSQ. This allows to reduce the number of memory ports
+    that go to LSQs, thereby improving the circuit's performance and area thanks
+    to LSQ size reduction (or elimination, in some instances). The pass does not
+    modify the IR's structure, it only sets `handshake::MemInterfaceAttr`
+    attributes on memory ports to encode the analysis' results.
+
+    The pass requires that all eligible operations within Handshake functions
+    are tagged with the basic block they belong to, and that all memory access
+    operations are uniquely named.
+  }];
+  let constructor = "dynamatic::createHandshakeAnalyzeLSQUsage()";
+}
+
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
   let summary = "Canonicalize Handshake operations.";
   let description = [{
@@ -158,35 +176,6 @@ def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
   let constructor = "dynamatic::createHandshakeMaterialize()";
 }
 
-def HandshakeMiminizeLSQUsage : DynamaticPass<"handshake-minimize-lsq-usage"> {
-  let summary = "Minimizes the number of memory ports that go to LSQs.";
-  let description = [{
-    Performs flow analysis to identify WAR dependencies between memory accesses
-    that are ensured by the circuit's semantics and which therefore do not need
-    to be enforced by an LSQ. This allows to reduce the number of memory ports
-    that go to LSQs, thereby improving the circuit's performance and area thanks
-    to LSQ size reduction (or elimination, in some instances).
-
-    The pass requires that all eligible operations within Handshake functions
-    are tagged with the basic block they belong to, and that all memory access
-    operations are uniquely named.
-  }];
-  let constructor = "dynamatic::createHandshakeMinimizeLSQUsage()";
-}
-
-def HandshakePrepareForLegacy : DynamaticPass<"handshake-prepare-for-legacy"> {
-  let summary = "Prepare the IR for usage in legacy Dynamatic.";
-  let description = [{
-    This pass transforms the circuit to make it follow conventions set by legacy
-    Dynamatic. It should be ran before DOT export in order to generate a .dot
-    file that will be compatible with legacy passes. Concretely, this pass (1)
-    turns unconditional branches (which legacy Dynamatic never generates) into
-    conditional branches with a constant condition input and a sinked false
-    output and (2) downgraded cmerges to simple merges when possible.  
-  }];
-  let constructor = "dynamatic::createHandshakePrepareForLegacy()";
-}
-
 def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths", 
                                                 ["mlir::arith::ArithDialect"]> {
   let summary = "Optimize bitwidths of all channels.";
@@ -197,10 +186,6 @@ def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths",
     the Handhsake level.
   }];
   let constructor = "dynamatic::createHandshakeOptimizeBitwidths()";
-  let options = [Option<"legacy", "legacy", "bool", "false",
-    "When legacy mode is enabled, disables bitwidth optimization of memory "
-    "address channels since they sometime make the legacy dot2vhdl tool "
-    "fail.">];
 }
 
 def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
@@ -217,6 +202,26 @@ def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
   let options =
     [Option<"optNegatives", "opt-negatives", "bool", "false",
             "If true, allows bitwidth optimization of negative values.">];
+}
+
+def HandshakeReplaceMemoryInterfaces : DynamaticPass<
+  "handshake-replace-memory-interfaces"
+> {
+  let summary = "Place memory interfaces according to memoty port annotations.";
+  let description = [{
+    Replaces existing memory interfaces and memory ports in Handshake functions
+    following the `handshake::MemInterfaceAttr` attribute on each memory port.
+    
+    In general the pass needs to identify new control signals to appropriately
+    trigger group allocations in newly created memory interfaces. It will fail
+    when its heuristic does not manage to find the control signal of a "basic
+    block" inside a Handshake function.
+
+    The pass requires that all eligible operations within Handshake functions
+    are tagged with the basic block they belong to, and that all memory access
+    operations are uniquely named.
+  }];
+  let constructor = "dynamatic::createHandshakeReplaceMemoryInterfaces()";
 }
 
 def HandshakeReshapeChannels : DynamaticPass<"handshake-reshape-channels"> {

@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/JSON/JSON.h"
 #include "mlir/Support/LogicalResult.h"
@@ -32,13 +33,19 @@ namespace ljson = llvm::json;
 //===----------------------------------------------------------------------===//
 
 unsigned dynamatic::getOpDatawidth(Operation *op) {
-  // All arithmetic operations are handled the same way
-  if (op->getName().getDialectNamespace() == "arith")
-    return getHandshakeTypeBitWidth(op->getOperand(0).getType());
-
   // Handshake operations have various semantics and must be handled on a
   // case-by-case basis
   return llvm::TypeSwitch<Operation *, unsigned>(op)
+      .Case<handshake::SelectOp>([&](auto) {
+        // The first operand of SelectOp is always an 1-bit wide control signal,
+        // so here we look up the width of the second or third input's bitwidth
+        return getHandshakeTypeBitWidth(op->getOperand(1).getType());
+      })
+      .Case<handshake::ArithOpInterface>([&](auto) {
+        // This option matches all the handshake equivalent of arith/math
+        // operations
+        return getHandshakeTypeBitWidth(op->getOperand(0).getType());
+      })
       .Case<handshake::MergeLikeOpInterface>(
           [&](handshake::MergeLikeOpInterface mergeLikeOp) {
             return getHandshakeTypeBitWidth(

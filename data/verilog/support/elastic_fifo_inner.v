@@ -16,9 +16,9 @@ module elastic_fifo_inner #(
   // Internal Signal Definition
   wire ReadEn, WriteEn;
   reg [$clog2(NUM_SLOTS) - 1 : 0] Tail = 0, Head = 0;
-  reg Full = 0, Empty = 0, fifo_valid;
-
+  reg Full = 0, Empty = 0;
   reg [DATA_TYPE - 1 : 0] Memory[0 : NUM_SLOTS - 1];
+  integer i;
   
   // Ready if there is space in the FIFO
   assign ins_ready = ~Full | outs_ready;
@@ -29,18 +29,14 @@ module elastic_fifo_inner #(
   assign WriteEn = ins_valid & (~Full | outs_ready);
   assign outs = Memory[Head];
 
-  // Update FIFO valid
-  always @(posedge clk, posedge rst) begin
-    if (rst) begin
-      fifo_valid <= 0;
-    end else if (ReadEn) begin
-      fifo_valid <= 1;
-    end else if (outs_ready) begin
-      fifo_valid <= 0;
-    end
+  // Initialize memory content
+  initial begin
+     for (i=0; i<NUM_SLOTS; i=i+1) begin
+        Memory[i] = 0;
+     end
   end
 
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       
     end else if (WriteEn) begin
@@ -49,7 +45,7 @@ module elastic_fifo_inner #(
   end
 
   // Update Tail
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       Tail <= 0;
     end else begin
@@ -60,7 +56,7 @@ module elastic_fifo_inner #(
   end
 
   // Update Head
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       Head <= 0;
     end else begin
@@ -71,7 +67,7 @@ module elastic_fifo_inner #(
   end
 
   // Update Full
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       Full <= 0;
     end else begin
@@ -89,7 +85,7 @@ module elastic_fifo_inner #(
   end
 
   // Update Empty
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       Empty <= 1;
     end else begin

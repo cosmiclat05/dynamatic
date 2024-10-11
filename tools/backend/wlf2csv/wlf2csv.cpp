@@ -14,7 +14,9 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/HW/PortImplementation.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/System.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -30,7 +32,6 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
@@ -76,133 +77,6 @@ struct SignalInfo {
   unsigned dstPortID;
 
   SignalInfo(Value val, StringRef signalName);
-
-  /// Finds the position (block index and operand index) of a value in the
-  /// inputs of a memory interface.
-  static std::pair<size_t, size_t> findValueInGroups(FuncMemoryPorts &ports,
-                                                     Value val) {
-    unsigned numGroups = ports.getNumGroups();
-    unsigned accInputIdx = 0;
-    for (size_t groupIdx = 0; groupIdx < numGroups; ++groupIdx) {
-      ValueRange groupInputs = ports.getGroupInputs(groupIdx);
-      accInputIdx += groupInputs.size();
-      for (auto [inputIdx, input] : llvm::enumerate(groupInputs)) {
-        if (input == val)
-          return std::make_pair(groupIdx, inputIdx);
-      }
-    }
-
-    // Value must belong to a port with another memory interface, find the one
-    for (auto [inputIdx, input] :
-         llvm::enumerate(ports.getInterfacesInputs())) {
-      if (input == val)
-        return std::make_pair(numGroups, inputIdx + accInputIdx);
-    }
-    llvm_unreachable("value should be an operand to the memory interface");
-  }
-
-  /// Corrects for different output port ordering conventions with legacy
-  /// Dynamatic.
-  static size_t fixOutputPortNumber(Operation *op, size_t idx) {
-    return llvm::TypeSwitch<Operation *, size_t>(op)
-        .Case<handshake::ConditionalBranchOp>([&](auto) {
-          // Legacy Dynamatic has the data operand before the condition operand
-          return idx;
-        })
-        .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>(
-            [&](auto) {
-              // Legacy Dynamatic has the data operand/result before the address
-              // operand/result
-              return 1 - idx;
-            })
-        .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
-          // Legacy Dynamatic places the end control signal before the signals
-          // going to the MC, if one is connected
-          LSQPorts lsqPorts = lsqOp.getPorts();
-          if (!lsqPorts.hasAnyPort<MCLoadStorePort>())
-            return idx;
-
-          // End control signal succeeded by laad address, store address, store
-          // data
-          if (idx == lsqOp.getNumResults() - 1)
-            return idx - 3;
-
-          // Signals to MC preceeded by end control signal
-          unsigned numLoads = lsqPorts.getNumPorts<LSQLoadPort>();
-          if (idx >= numLoads)
-            return idx + 1;
-          return idx;
-        })
-        .Default([&](auto) { return idx; });
-  }
-
-  /// Corrects for different input port ordering conventions with legacy
-  /// Dynamatic.
-  static size_t fixInputPortNumber(Operation *op, size_t idx) {
-    return llvm::TypeSwitch<Operation *, size_t>(op)
-        .Case<handshake::ConditionalBranchOp>([&](auto) {
-          // Legacy Dynamatic has the data operand before the condition operand
-          return 1 - idx;
-        })
-        .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>(
-            [&](auto) {
-              // Legacy Dynamatic has the data operand/result before the address
-              // operand/result
-              return 1 - idx;
-            })
-        .Case<handshake::MemoryOpInterface>(
-            [&](handshake::MemoryOpInterface memOp) {
-              Value val = op->getOperand(idx);
-
-              // Legacy Dynamatic puts all control operands before all data
-              // operands, whereas for us each control operand appears just
-              // before the data inputs of the group it corresponds to
-              FuncMemoryPorts ports = getMemoryPorts(memOp);
-
-              // Determine total number of control operands
-              unsigned ctrlCount = ports.getNumPorts<ControlPort>();
-
-              // Figure out where the value lies
-              auto [groupIDx, opIdx] = findValueInGroups(ports, val);
-
-              if (groupIDx == ports.getNumGroups()) {
-                // If the group index is equal to the number of connected
-                // groups, then the operand index points directly to the
-                // matching port in legacy Dynamatic's conventions
-                return opIdx;
-              }
-
-              // Figure out at which index the value would be in legacy
-              // Dynamatic's interface
-              bool valGroupHasControl = ports.groups[groupIDx].hasControl();
-              if (opIdx == 0 && valGroupHasControl) {
-                // Value is a control input
-                size_t fixedIdx = 0;
-                for (size_t i = 0; i < groupIDx; i++)
-                  if (ports.groups[i].hasControl())
-                    fixedIdx++;
-                return fixedIdx;
-              }
-
-              // Value is a data input
-              size_t fixedIdx = ctrlCount;
-              for (size_t i = 0; i < groupIDx; i++) {
-                // Add number of data inputs corresponding to the group, minus
-                // the control input which was already accounted for (if
-                // present)
-                fixedIdx += ports.groups[i].getNumInputs();
-                if (ports.groups[i].hasControl())
-                  --fixedIdx;
-              }
-              // Add index offset in the group the value belongs to
-              if (valGroupHasControl)
-                fixedIdx += opIdx - 1;
-              else
-                fixedIdx += opIdx;
-              return fixedIdx;
-            })
-        .Default([&](auto) { return idx; });
-  }
 };
 
 struct ChannelState {
@@ -212,8 +86,9 @@ struct ChannelState {
   WireState ready = WireState::UNDEFINED;
   std::vector<WireState> data;
 
-  ChannelState(Type type, size_t datawidth)
-      : type(type), data(std::vector{datawidth, WireState::UNDEFINED}) {}
+  ChannelState(Type type)
+      : type(type), data(std::vector{handshake::getHandshakeTypeBitWidth(type),
+                                     WireState::UNDEFINED}) {}
 
   std::string decodeData() const {
     if (data.empty())
@@ -221,10 +96,13 @@ struct ChannelState {
 
     // Build a string from the vector of bits
     std::string dataString;
+    bool partlyUndef = false;
     for (WireState bit : llvm::reverse(data)) {
       switch (bit) {
       case WireState::UNDEFINED:
-        return "undef";
+        dataString.push_back('u');
+        partlyUndef = true;
+        break;
       case WireState::LOGIC_0:
         dataString.push_back('0');
         break;
@@ -233,14 +111,18 @@ struct ChannelState {
         break;
       }
     }
+    if (partlyUndef)
+      return dataString;
 
-    if (auto intType = dyn_cast<IntegerType>(type)) {
+    auto channelType = cast<handshake::ChannelType>(type);
+    auto dataType = channelType.getDataType();
+    if (auto intType = dyn_cast<IntegerType>(dataType)) {
       APInt intVal(data.size(), dataString, 2);
       if (intType.isSigned())
         return std::to_string(intVal.getSExtValue());
       return std::to_string(intVal.getZExtValue());
     }
-    if (auto floatType = dyn_cast<FloatType>(type)) {
+    if (auto floatType = dyn_cast<FloatType>(dataType)) {
       APFloat floatVal(floatType.getFloatSemantics(), dataString);
       return std::to_string(floatVal.convertToDouble());
     }
@@ -266,26 +148,26 @@ SignalInfo::SignalInfo(Value val, StringRef signalName)
   // Derive the source component's name and ID
   if (auto res = dyn_cast<OpResult>(val)) {
     Operation *producerOp = res.getOwner();
-    srcPortID = fixOutputPortNumber(producerOp, res.getResultNumber());
+    srcPortID = res.getResultNumber();
     srcComponent = getUniqueName(producerOp);
   } else {
     auto arg = cast<BlockArgument>(val);
     auto funcOp = cast<handshake::FuncOp>(arg.getParentBlock()->getParentOp());
-    srcPortID = 0;
-    std::string argName = funcOp.getArgName(arg.getArgNumber()).str();
-    if (argName == "start") {
-      // Legacy contention that the visualizer expects, follow for now
-      argName = "start_0";
-    }
-    srcComponent = argName;
+    srcPortID = arg.getArgNumber();
+    srcComponent = funcOp.getArgName(arg.getArgNumber()).str();
   }
 
   // Derive the destination component's name and ID
   OpOperand &oprd = *val.getUses().begin();
   Operation *consumerOp = oprd.getOwner();
   if (!isa<MemRefType>(oprd.get().getType()))
-    dstPortID = fixInputPortNumber(consumerOp, oprd.getOperandNumber());
-  dstComponent = getUniqueName(consumerOp);
+    dstPortID = oprd.getOperandNumber();
+  if (isa<handshake::EndOp>(consumerOp)) {
+    auto funcOp = cast<handshake::FuncOp>(val.getParentBlock()->getParentOp());
+    dstComponent = funcOp.getResName(oprd.getOperandNumber()).str();
+  } else {
+    dstComponent = getUniqueName(consumerOp);
+  }
 }
 
 std::optional<WireReference>
@@ -293,15 +175,15 @@ WireReference::fromSignal(StringRef signalName,
                           const llvm::StringMap<Value> &ports) {
   // Check if this is a data signal
   if (signalName.ends_with(")")) {
-    // Try to extract the vector's indexfrom the signal name
+    // Try to extract the vector's index from the signal name
     size_t idx = signalName.rfind("(");
     if (idx == std::string::npos)
       return std::nullopt;
     StringRef dataIdxStr = signalName.slice(idx + 1, signalName.size() - 1);
 
     // Try to convert the index to an unsigned
-    unsigned long long dataIdx;
-    if (getAsUnsignedInteger(dataIdxStr, 10, dataIdx))
+    unsigned dataIdx;
+    if (dataIdxStr.getAsInteger(10, dataIdx))
       return std::nullopt;
 
     // Try to match the port's name to an SSA value
@@ -363,13 +245,13 @@ static LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
   }
 
   // First associate names to all function arguments
-  hw::PortNameGenerator argNameGen(funcOp);
+  handshake::PortNamer argNameGen(funcOp);
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
     ports.insert({argNameGen.getInputName(idx), arg});
 
-  // First associate names to each operation's results
+  // Then associate names to each operation's results
   for (Operation &op : funcOp.getOps()) {
-    hw::PortNameGenerator resNameGen(&op);
+    handshake::PortNamer resNameGen(&op);
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
       std::string signalName =
           getUniqueName(&op).str() + "_" + resNameGen.getOutputName(idx).str();
@@ -441,12 +323,10 @@ int main(int argc, char **argv) {
   mlir::DenseMap<Value, SignalInfo> valueToSignalInfo;
   mlir::DenseMap<Value, ChannelState> state;
   for (auto &[signalName, val] : signalNameToValue) {
-    valueToSignalInfo.insert({val, SignalInfo{val, signalName}});
-
-    unsigned width = 0;
-    if (isa<IntegerType, FloatType>(val.getType()))
-      width = val.getType().getIntOrFloatBitWidth();
-    state.insert({val, ChannelState{val.getType(), width}});
+    if (isa<MemRefType>(val.getType()))
+      continue;
+    valueToSignalInfo.try_emplace(val, val, signalName);
+    state.try_emplace(val, val.getType());
   }
 
   std::map<size_t, WireReference> wires;
@@ -455,12 +335,18 @@ int main(int argc, char **argv) {
 
   // Read the LOG file line by line
   std::string event;
-  while (std::getline(logFileStream, event)) {
+  for (size_t lineNum = 1; std::getline(logFileStream, event); ++lineNum) {
     // Split the line into space-separated tokens
     SmallVector<StringRef> tokens;
     StringRef{event}.split(tokens, ' ');
     if (tokens.empty())
       continue;
+
+    auto error = [&](const Twine &msg) -> LogicalResult {
+      llvm::errs() << "On line " << lineNum << ": " << msg << "\nIn: " << event
+                   << "\n";
+      return failure();
+    };
 
     using LogCallback = std::function<LogicalResult()>;
     auto handleLogType = [&](StringRef identifier, size_t minNumTokens,
@@ -468,24 +354,20 @@ int main(int argc, char **argv) {
       if (tokens.front() != identifier)
         return false;
       if (tokens.size() < minNumTokens) {
-        llvm::errs() << "Expected at least " << minNumTokens
-                     << " tokens, but got " << tokens.size() << "\n";
+        (void)error("Expected at least " + std::to_string(minNumTokens) +
+                    " tokens, but got " + std::to_string(tokens.size()));
         exit(1);
       }
-      if (failed(callback())) {
-        llvm::errs() << "Failed parsing for log type \"" << identifier
-                     << "\"\n";
+      if (failed(callback()))
         exit(1);
-      }
       return true;
     };
 
     LogCallback setSignalAssociation = [&]() {
-      unsigned long long wireID;
-      if (getAsUnsignedInteger(tokens[2], 10, wireID)) {
-        llvm::errs() << "Expected integer identifier for signal, but got "
-                     << tokens[2] << "\n";
-        return failure();
+      unsigned wireID;
+      if (tokens[2].getAsInteger(10, wireID)) {
+        return error("expected integer identifier for signal, but got " +
+                     tokens[2]);
       }
       StringRef signalName = StringRef{tokens[1]}.drop_front(level.size());
       if (auto wire = WireReference::fromSignal(signalName, signalNameToValue))
@@ -521,22 +403,20 @@ int main(int argc, char **argv) {
       std::string timeStr = tokens[1].str();
       timeStr.erase(std::remove(timeStr.begin(), timeStr.end(), '.'),
                     timeStr.end());
-      unsigned long long time;
-      if (getAsUnsignedInteger(timeStr, 10, time)) {
-        llvm::errs() << "Expected integer identifier for time, but got "
-                     << timeStr << "\n";
-        return failure();
+      unsigned time;
+      if (StringRef{timeStr}.getAsInteger(10, time)) {
+        return error("expected integer identifier for time, but got " +
+                     timeStr);
       }
       cycle = (time < PERIOD) ? 0 : (time - HALF_PERIOD) / PERIOD + 1;
       return success();
     };
 
     LogCallback changeWireState = [&]() {
-      unsigned long long wireID;
-      if (getAsUnsignedInteger(tokens[1], 10, wireID)) {
-        llvm::errs() << "Expected integer identifier for signal, but got "
-                     << tokens[1] << "\n";
-        return failure();
+      unsigned wireID;
+      if (tokens[1].getAsInteger(10, wireID)) {
+        return error("expected integer identifier for signal, but got " +
+                     tokens[1]);
       }
 
       // Just ignore wires we don't know
@@ -558,8 +438,13 @@ int main(int argc, char **argv) {
         channelState.ready = wireState;
         break;
       case SignalType::DATA:
-        assert(wire.idx && "index undefined for data wire");
-        assert(*wire.idx < channelState.data.size() && "index out of bounds");
+        if (!wire.idx)
+          return error("index undefined for data wire");
+        if (*wire.idx >= channelState.data.size()) {
+          return error("index out of bounds, expected number between 0 and " +
+                       std::to_string(channelState.data.size()) + ", but got " +
+                       std::to_string(*wire.idx));
+        }
         channelState.data[*wire.idx] = wireState;
         break;
       }
