@@ -568,12 +568,9 @@ CommandResult Compile::execute(CommandArguments &args) {
   // the deadlock freeness.
   std::string buffers = "on-merges";
 
-<<<<<<< HEAD
-
-=======
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
-    if (it->second == "on-merges" || it->second == "fpga20" ||
-        it->second == "fpl22") {
+    if (it->second == "on-merges" || it->second == "cut-loopbacks"|| it->second == "fpga20" ||
+        it->second == "fpl22" || it->second == "mapbuf") {
       buffers = it->second;
     } else {
       llvm::errs()
@@ -586,7 +583,6 @@ CommandResult Compile::execute(CommandArguments &args) {
   }
 
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
->>>>>>> upstream/main
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
                             : state.polygeistPath;

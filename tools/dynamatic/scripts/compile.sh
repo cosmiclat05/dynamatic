@@ -14,11 +14,8 @@ KERNEL_NAME=$4
 BUFFER_ALGORITHM=$5
 TARGET_CP=$6
 POLYGEIST_PATH=$7
-<<<<<<< HEAD
 MAPBUF_BLIF_DIR=$8
-=======
-USE_SHARING=$8
->>>>>>> upstream/main
+USE_SHARING=$9
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -137,6 +134,7 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
   --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
   --handshake-minimize-cst-width --handshake-optimize-bitwidths \
   --handshake-materialize --handshake-infer-basic-blocks \
+  --tutorial-handshake-simplify-merge-like \
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
@@ -150,7 +148,8 @@ else
 fi
 
 # Buffer placement
-if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
+
+if [[ "$BUFFER_ALGORITHM" == "on-merges" || "$BUFFER_ALGORITHM" == "cut-loopbacks" ]]; then
   # Simple buffer placement
   echo_info "Running simple buffer placement (on-merges)."
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
@@ -174,6 +173,7 @@ else
     > $F_FREQUENCIES
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 
+  if [[ "$BUFFER_ALGORITHM" == "mapbuf" ]]; then
   echo_info "Running smart buffer placement with CP = $TARGET_CP"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
@@ -189,10 +189,22 @@ else
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs blif-file=$OUTPUT_DIR/mapbuf/" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=600 dump-logs blif-file=$OUTPUT_DIR/mapbuf/" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null
+
+  else
+    # Smart buffer placement
+    echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
+    cd "$COMP_DIR"
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+      --handshake-set-buffering-properties="version=fpga20" \
+      --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=600 dump-logs blif-file=$OUTPUT_DIR/mapbuf/" \
+      > "$F_HANDSHAKE_BUFFERED"
+    exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
+    cd - > /dev/null
+  fi
 
 fi
 

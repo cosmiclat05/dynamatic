@@ -1,27 +1,5 @@
-# Sample sequence of commands for Dynamatic frontend
-
-# Indicate the path to Dynamatic's top-level directory here (leave unchanged if
-# running the frontend from the top-level directory)
 set-dynamatic-path  .
 
-# Set the source file to run (kernel must have the same name as the filename,
-# without the extension)
-set-src             integration-test/cnn/cnn.c
+set-src             integration-test/fir/fir.c
 
-<<<<<<< HEAD
-compile 
-write-hdl 
-=======
-# Compile (from source to Handshake IR/DOT)
-# Remove the flag to run smart buffer placement (requires Gurobi)
-compile             --buffer-algorithm on-merges
-
-# Generate the VHDL for the dataflow circuit
-write-hdl
-
-# Simulate using Modelsim
->>>>>>> upstream/main
-simulate
-synthesize
-
-
+compile --buffer-algorithm fpga20

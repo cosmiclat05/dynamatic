@@ -13,8 +13,12 @@
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
+#include "gurobi_c.h"
 #include "mlir/IR/Value.h"
+#include "llvm/Support/raw_ostream.h"
+#include <map>
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -139,14 +143,116 @@ void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
   }
 }
 
+std::optional<GRBVar> variableExistss(GRBModel &model,
+                                     const std::string &varName) {
+  GRBVar *vars = model.getVars();
+  int numVars = model.get(GRB_IntAttr_NumVars);
+
+  // Loop through all variables and check their names
+  for (int i = 0; i < numVars; i++) {
+    if (vars[i].get(GRB_StringAttr_VarName) == varName) {
+      return vars[i]; // Variable exists
+    }
+  }
+  return {}; // Variable does not exist
+}
+
 void FPGA20Buffers::setup() {
+  // // Count the number of operations in the function
+  // int numOps = 0;
+  // for (Operation &op : funcInfo.funcOp.getOps()) {
+  //   ++numOps;
+  // }
+
+  // std::vector<Value> allChannels;
+  // std::vector<std::vector<GRBVar>> varVector;
+  // for (auto &[channel, _] : channelProps) {
+  //       if (!channel.getDefiningOp<handshake::MemoryOpInterface>() &&
+  //       !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin())){
+  //   allChannels.push_back(channel);
+  //   ChannelVars &channelVars = vars.channelVars[channel];
+  //   std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
+  //   auto createVar = [&](const llvm::Twine &name, char type) {
+  //     return model.addVar(0, 2, 0.0, type, (name + suffix).str());
+  //   };
+  //   ChannelSignalVars &signalVars = channelVars.signalVars[SignalType::DATA];
+  //   signalVars.bufPresent = createVar("dataBufPresent", GRB_BINARY);
+
+  //   channelVars.bufPresent = createVar("bufPresent", GRB_BINARY);
+  //   channelVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
+
+  //   model.update();
+
+  //   model.addConstr(channelVars.bufPresent == signalVars.bufPresent,
+  //                   "buf_slots_positive");
+  //   model.addConstr(channelVars.bufNumSlots == signalVars.bufPresent * 2,
+  //                   "buf_slots_positive");
+
+  //   GRBVar before;
+  //   Operation *defOp = channel.getDefiningOp();
+  //   if (defOp) {
+  //     std::string uniqueOpName =
+  //         defOp->getName().getStringRef().str() + "_" +
+  //         std::to_string(reinterpret_cast<uintptr_t>(defOp));
+  //     // Check if a variable with the same name already exists in the model
+  //     std::optional<GRBVar> beforeVar = variableExistss(model, uniqueOpName);
+  //     if (beforeVar.has_value()) {
+  //       before = beforeVar.value();
+  //     } else {
+  //       before = model.addVar(0, numOps - 1, 0.0, GRB_INTEGER, uniqueOpName);
+  //     }
+  //   } else {
+  //     before = model.addVar(0, 0, 0.0, GRB_INTEGER, "before");
+  //   }
+
+  //   GRBVar after;
+  //   if (!channel.use_empty()) {
+  //     Operation *useOp = *channel.user_begin();
+  //     std::string uniqueOpName =
+  //         useOp->getName().getStringRef().str() + "_" +
+  //         std::to_string(reinterpret_cast<uintptr_t>(useOp));
+  //     std::optional<GRBVar> afterVar = variableExistss(model, uniqueOpName);
+  //     if (afterVar.has_value()) {
+  //       after = afterVar.value();
+  //     } else {
+  //       after = model.addVar(0, numOps - 1, 0.0, GRB_INTEGER, uniqueOpName);
+  //     }
+  //   } else {
+  //     after = model.addVar(0, 0, 0.0, GRB_INTEGER, "after");
+  //   }
+
+  //   varVector.push_back({signalVars.bufPresent, before, after});
+
+  //   model.update();
+  // }
+  // }
+
+  // GRBLinExpr obj = 0;
+  // for (const auto &entry : varVector) {
+  //   obj += entry[0];
+  // }
+
+  // model.setObjective(obj, GRB_MINIMIZE);
+  // model.update();
+
+  // for (auto &entry : varVector) {
+  //   GRBVar &bufVar = entry[0];
+  //   GRBVar &before = entry[1];
+  //   GRBVar &after = entry[2];
+  //   model.addConstr(after - before + 100 * bufVar >= 1, "buf_order");
+  // }
+
+  // model.update();
+
   // Signals for which we have variables
   SmallVector<SignalType, 1> signals;
   signals.push_back(SignalType::DATA);
 
-  /// NOTE: (lucas-rami) For each buffering group this should be the timing
-  /// model of the buffer that will be inserted by the MILP for this group. We
-  /// don't have models for these buffers at the moment therefore we provide a
+  // /// NOTE: (lucas-rami) For each buffering group this should be the timing
+  // /// model of the buffer that will be inserted by the MILP for this group.
+  // We
+  // /// don't have models for these buffers at the moment therefore we provide
+  // a
   /// null-model to each group, but this hurts our placement's accuracy.
   const TimingModel *bufModel = nullptr;
 
@@ -159,7 +265,25 @@ void FPGA20Buffers::setup() {
   for (auto &[channel, _] : channelProps) {
     allChannels.push_back(channel);
     addChannelVars(channel, signals);
-    addCustomChannelConstraints(channel);
+    //addCustomChannelConstraints(channel);
+
+        ChannelVars &channelVars = vars.channelVars[channel];
+    std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
+    auto createVar = [&](const llvm::Twine &name, char type) {
+      return model.addVar(0, 1, 0.0, type, (name + suffix).str());
+    };
+    ChannelSignalVars &signalVars = channelVars.signalVars[SignalType::DATA];
+    signalVars.bufPresent = createVar("dataBufPresent", GRB_BINARY);
+
+    channelVars.bufPresent = createVar("bufPresent", GRB_BINARY);
+    channelVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
+
+    model.update();
+
+    model.addConstr(channelVars.bufPresent == signalVars.bufPresent,
+                    "buf_slots_positive");
+    model.addConstr(channelVars.bufNumSlots == signalVars.bufPresent,
+                    "buf_slots_positive");
 
     // Add path and elasticity constraints over all channels in the function
     // that are not adjacent to a memory interface
@@ -176,20 +300,28 @@ void FPGA20Buffers::setup() {
     addUnitElasticityConstraints(&op);
   }
 
-  // Create CFDFC variables and add throughput constraints for each CFDFC that
-  // was marked to be optimized
-  SmallVector<CFDFC *> cfdfcs;
-  for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
-    if (!optimize)
-      continue;
-    cfdfcs.push_back(cfdfc);
-    addCFDFCVars(*cfdfc);
-    addChannelThroughputConstraints(*cfdfc);
-    addUnitThroughputConstraints(*cfdfc);
+  GRBLinExpr obj = 0;
+  for (auto &[channel, channelVars] : vars.channelVars) {
+    obj += channelVars.signalVars[SignalType::DATA].bufPresent;
   }
 
-  // Add the MILP objective and mark the MILP ready to be optimized
-  addObjective(allChannels, cfdfcs);
+  model.setObjective(obj, GRB_MINIMIZE);
+
+  // // Create CFDFC variables and add throughput constraints for each CFDFC
+  // // that
+  // // was marked to be optimized
+  // SmallVector<CFDFC *> cfdfcs;
+  // for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
+  //   if (!optimize)
+  //     continue;
+  //   cfdfcs.push_back(cfdfc);
+  //   addCFDFCVars(*cfdfc);
+  //   addChannelThroughputConstraints(*cfdfc);
+  //   addUnitThroughputConstraints(*cfdfc);
+  // }
+
+  // // Add the MILP objective and mark the MILP ready to be optimized
+  // addObjective(allChannels, cfdfcs);
   markReadyToOptimize();
 }
 

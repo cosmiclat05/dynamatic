@@ -30,6 +30,7 @@
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
@@ -540,18 +541,14 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       // Make sure that all the loops are cut by placing at least one buffer
       funcOp.walk([&](mlir::Operation *op) {
         for (Value result : op->getResults()) {
-          // op->emitRemark() << "Channel Name: "
-          //                  << getUniqueName(*result.getUses().begin()) <<
-          //                  "\n";
           for (Operation *user : result.getUsers()) {
             if (isBackedge(result, user)) {
-              llvm::errs() << "backedge found" << result << "\n";
-              ChannelBufProps &resProps = channelProps[op->getResult(0)];
+              ChannelBufProps &resProps = channelProps[result];
               if (resProps.maxTrans.value_or(1) >= 1) {
                 resProps.minTrans = std::max(resProps.minTrans, 1U);
               } else {
                 op->emitWarning()
-                    << "Cannot place opaque buffer on loopback "
+                    << "Cannot place transparent buffer on loopback "
                        "due to channel-specific buffering constraints. "
                        "This "
                        "may "

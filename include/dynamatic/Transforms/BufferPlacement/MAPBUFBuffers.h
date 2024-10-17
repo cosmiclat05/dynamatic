@@ -73,8 +73,12 @@ protected:
   void extractResult(BufferPlacement &placement) override;
 
 private:
-
   StringRef blifFile;
+  std::vector<GRBVar> pathInVarsVector;
+  std::vector<GRBVar> pathOutVarsVector;
+  std::vector<GRBVar> bufVarsVector;
+  float lutDelay = 0.7;
+  int bigConstant = 100;
 
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
@@ -88,7 +92,13 @@ private:
 
   void addBlackboxConstraints();
 
-  void addClockPeriodConstraints(experimental::BlifData &blif, std::unordered_map<std::string, GRBVar> &nodeToGRB);
+  void
+  addClockPeriodConstraintsNodes(experimental::BlifData &blif,
+                            std::unordered_map<std::string, GRBVar> &nodeToGRB);
+
+  void addClockPeriodConstraintsChannels(Value channel, SignalType signal);
+
+  void retrieveFPGA20Constraints(GRBModel &model);
 
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior

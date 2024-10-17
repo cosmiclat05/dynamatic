@@ -547,9 +547,9 @@ static std::string getPrettyNodeLabel(Operation *op) {
                     dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
               TimingInfo info = timing.getInfo();
               if (info == TimingInfo::oehb())
-                return getUniqueName(op).str() + numSlotsStr;
+                return "oehb" + numSlotsStr;
               if (info == TimingInfo::tehb())
-                return getUniqueName(op).str() + numSlotsStr;
+                return "tehb" + numSlotsStr;
             }
             return "buffer" + numSlotsStr;
           })
