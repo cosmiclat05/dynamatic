@@ -176,9 +176,9 @@ void MAPBUFBuffers::addCutSelectionConstraints() {
     for (size_t i = 0; i < val.size(); ++i) {
       auto &cut = val[i];
       GRBVar &cutSelection = cut.cutSelection;
-      cutSelection =
-          model.addVar(0, GRB_INFINITY, 0, GRB_BINARY,
-                       (cut.root + "__CutSelection_" + std::to_string(i)));
+      cutSelection = model.addVar(
+          0, GRB_INFINITY, 0, GRB_BINARY,
+          (cut.root->str() + "__CutSelection_" + std::to_string(i)));
       cutSelectionSum += cutSelection;
     }
     model.update();
@@ -193,7 +193,8 @@ std::optional<GRBVar> variableExists(GRBModel &model,
 
   // Loop through all variables and check their names
   for (int i = 0; i < numVars; i++) {
-    if (vars[i].get(GRB_StringAttr_VarName) == varName) {
+    if (vars[i].get(GRB_StringAttr_VarName).find(varName) !=
+        std::string::npos) {
       return vars[i]; // Variable exists
     }
   }
@@ -205,7 +206,6 @@ enum ConstraintNames {
   trivial_cut_delay,      // 1
   delay_propagation,      // 2
   cut_selection_conflict, // 3
-
 };
 
 constexpr std::string_view getConstraintName(ConstraintNames constraint) {
@@ -245,7 +245,7 @@ public:
   GRBVar variableIncludes(const std::string &subStr,
                           std::unordered_map<std::string, GRBVar> &nodeToGrb,
                           const std::string &key) {
-    
+
     for (auto &pair : variableMap) {
       if (pair.first.find(subStr) != std::string::npos) {
         return pair.second.front();
@@ -452,36 +452,71 @@ void MAPBUFBuffers::addBlackboxConstraints() {
 }
 
 void MAPBUFBuffers::addClockPeriodConstraintsNodes(
-    experimental::BlifData &blif,
-    std::unordered_map<std::string, GRBVar> &nodeToGRB) {
+    experimental::BlifData &blif) {
   // Add clock period constraints for subject graph edges. For subject graph
   // edges, there is no need for 2 variables like channels, one at the input and
   // one at the output. We only need one variable for each node.
   // Also adds constraints for primary inputs and constants.
 
-  for (auto &node : blif.getNodes()) {
-    GRBVar &nodeVar = nodeToGRB[node];
-    nodeVar = model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node);
-    model.update();
-    if (blif.isPrimaryInput(node)) {
-      model.addConstr(nodeVar == 0, "input_delay");
-      // std::string pathInName = retrieveChannelName(node, "pathIn").str();
-      // if (blif.isConstantNode(node)) {
-      //   std::string pathInName = retrieveChannelName(node, "pathIn").str();
-      //   GRBVar nodeVarChannel =
-      //       pathInSearcher.variableIncludes(pathInName, nodeToGRB, node);
+  auto retrieveAndSearchGRBVar =
+      [&](const std::string &node,
+          const std::string &variableType) -> std::optional<GRBVar> {
+    std::string channelName = retrieveChannelName(node, variableType).str();
+    return variableExists(model, channelName);
+  };
 
-      //   model.addConstr(nodeVar == nodeVarChannel, "primary_input_channel");
-      // }
-    } else {
-      model.addConstr(nodeVar <= targetPeriod, "clock_period_constraint");
+  for (auto *node : blif.getNodesInOrder()) {
+    experimental::MILPVarsSubjectGraph *vars = node->gurobiVars;
+    GRBVar &nodeVarIn = vars->tIn;
+    GRBVar &nodeVarOut = vars->tOut;
+    std::optional<GRBVar> &nodeBufVar = vars->bufferVar;
+
+    auto isChannel = isChannelVar(node->str());
+    if (isChannel) {
+      std::optional<GRBVar> pathInVar =
+          retrieveAndSearchGRBVar(node->str(), "pathIn");
+      std::optional<GRBVar> pathOutVar =
+          retrieveAndSearchGRBVar(node->str(), "pathOut");
+      std::optional<GRBVar> bufferVar =
+          retrieveAndSearchGRBVar(node->str(), "buffer");
+
+      if (pathInVar.has_value() && pathOutVar.has_value() &&
+          bufferVar.has_value()) {
+        nodeVarIn = pathInVar.value();
+        nodeVarOut = pathOutVar.value();
+        nodeBufVar = bufferVar;
+        model.addConstr(nodeVarIn <= targetPeriod, "pathIn_period");
+        model.addConstr(nodeVarOut <= targetPeriod, "pathOut_period");
+        model.addConstr(
+            nodeVarOut - nodeVarIn + bigConstant * nodeBufVar.value() >= 0,
+            "buf_delay");
+      } else {
+        // means it is an input
+        nodeVarIn =
+            model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node->str());
+        nodeVarOut = nodeVarIn;
+        if (node->isPrimaryInput()) {
+          model.addConstr(nodeVarIn == 0, "input_delay");
+        } else {
+          model.addConstr(nodeVarIn <= targetPeriod, "clock_period_constraint");
+        }
+      }
+      model.update();
+      continue;
     }
+    nodeVarIn = model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node->str());
+    nodeVarOut = nodeVarIn;
+    if (node->isPrimaryInput()) {
+      model.addConstr(nodeVarIn == 0, "input_delay");
+    } else {
+      model.addConstr(nodeVarIn <= targetPeriod, "clock_period_constraint");
+    }
+    model.update();
   }
-  model.update();
 }
 
-void MAPBUFBuffers::addClockPeriodConstraintsChannels(Value channel,
-                                                      SignalType signal) {
+void MAPBUFBuffers::addClockPeriodConstraintsChannels(
+    Value channel, SignalType signal, experimental::BlifData &blif) {
   // Add clock period constraints for each channel. The delay is not propagated
   // through the channel if a buffer is present.
   ChannelVars &channelVars = vars.channelVars[channel];
@@ -491,6 +526,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsChannels(Value channel,
       vars.channelVars[channel].signalVars[signal].bufPresent;
   GRBVar &t1 = signalVars.path.tIn;
   GRBVar &t2 = signalVars.path.tOut;
+
   model.addConstr(t2 <= targetPeriod, "pathOut_period");
   model.addConstr(t1 <= targetPeriod, "pathIn_period");
   model.addConstr(t2 - t1 + bigConstant * bufVarSignal >= 0, "buf_delay");
@@ -525,13 +561,13 @@ void MAPBUFBuffers::retrieveFPGA20Constraints(GRBModel &model) {
   file.close();
 }
 
-using pathMap =
-    std::unordered_map<std::pair<std::string, std::string>,
-                       std::vector<std::string>,
-                       boost::hash<std::pair<std::string, std::string>>>;
+using pathMap = std::unordered_map<
+    std::pair<experimental::Node *, experimental::Node *>,
+    std::vector<experimental::Node *>,
+    boost::hash<std::pair<experimental::Node *, experimental::Node *>>>;
 
-std::vector<std::string>
-getOrCreateLeafToRootPath(const std::string &key, const std::string &leaf,
+std::vector<experimental::Node *>
+getOrCreateLeafToRootPath(experimental::Node *key, experimental::Node *leaf,
                           pathMap leafToRootPaths,
                           experimental::BlifData &anchorsRemoved) {
   // Check if the path from leaf to root has already been computed, if not then
@@ -567,14 +603,15 @@ void MAPBUFBuffers::setup() {
   experimental::BlifData withAnchors =
       parser.parseBlifFile(blifFile.str() + "anchored.blif");
 
-  // Run cut enumeration on the both versions of the subject graph, with anchors and without anchors.
-  // Cut enumeration with anchors give us the cuts such that every node is enumerated until the channels.
-  // Cut enumeration without anchors give us the deepest cuts.
+  // Run cut enumeration on the both versions of the subject graph, with anchors
+  // and without anchors. Cut enumeration with anchors give us the cuts such
+  // that every node is enumerated until the channels. Cut enumeration without
+  // anchors give us the deepest cuts.
   experimental::Cuts cutsAnchorsRemoved(anchorsRemoved, 6, 0);
   cutsAnchorsRemoved.runCutAlgos(false, true, false, false);
 
-  experimental::Cuts cutsWithAnchors(withAnchors, 6, 0);
-  cutsWithAnchors.runCutAlgos(false, true, false, true);
+  // experimental::Cuts cutsWithAnchors(withAnchors, 6, 0);
+  // cutsWithAnchors.runCutAlgos(false, true, false, true);
   experimental::Cuts::printCuts("cuts.txt");
 
   /// NOTE: (lucas-rami) For each buffering group this should be the timing
@@ -591,9 +628,6 @@ void MAPBUFBuffers::setup() {
   bufGroups.push_back(dataValidGroup);
   bufGroups.push_back(readyGroup);
 
-  std::unordered_map<std::string, GRBVar> nodeToGRB;
-  std::unordered_map<std::string, GRBVar> channelToGRB;
-
   std::vector<Value> allChannels;
 
   GRBVar clockVar = model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "clock");
@@ -604,10 +638,6 @@ void MAPBUFBuffers::setup() {
     allChannels.push_back(channel);
     addChannelVars(channel, signals);
     addCustomChannelConstraints(channel);
-    for (SignalType signal : signals) {
-      // add clock period constraints for each channel
-      addClockPeriodConstraintsChannels(channel, signal);
-    }
     addChannelElasticityConstraints(channel, bufGroups);
   }
 
@@ -621,19 +651,37 @@ void MAPBUFBuffers::setup() {
     addUnitElasticityConstraints(&op, channelFilter);
   }
 
-  retrieveFPGA20Constraints(model);
+  // retrieveFPGA20Constraints(model);
 
-  addClockPeriodConstraintsNodes(anchorsRemoved, nodeToGRB);
+  addClockPeriodConstraintsNodes(anchorsRemoved);
 
   addBlackboxConstraints();
 
-  // addCutLoopbackBuffers();
+  addCutLoopbackBuffers();
 
   addCutSelectionConstraints();
 
-  VariableSearcher bufSearcher(bufVarsVector);
-  VariableSearcher pathInSearcher(pathInVarsVector);
-  VariableSearcher pathOutSearcher(pathOutVarsVector);
+  for (auto *node : anchorsRemoved.getNodesInOrder()) {
+    auto *anchoredNode = withAnchors.getNodeByName(node->str());
+    if (anchoredNode) {
+      *anchoredNode = *node;
+    }
+  }
+
+  for (auto &[key, val] : experimental::Cuts::cuts) {
+    for (auto &cut : val) {
+      for (auto *leaf : cut.leaves) {
+        auto *anchoredLeaf = withAnchors.getNodeByName(leaf->str());
+        if (anchoredLeaf) {
+          *anchoredLeaf = *leaf;
+        }
+      }
+      auto *anchoredRoot = withAnchors.getNodeByName(key->str());
+      if (anchoredRoot) {
+        *anchoredRoot = *key;
+      }
+    }
+  }
 
   // for (auto &node : anchorsRemoved.getNodes()) {
   //   GRBVar &nodeVar = nodeToGRB[node];
@@ -657,45 +705,38 @@ void MAPBUFBuffers::setup() {
   // }
   // model.update();
 
-  std::list<GrbConst> constraints;
-  std::list<GrbConst> constraintsEqual;
-
+  // std::list<GrbConst> constraints;
+  // std::list<GrbConst> constraintsEqual;
+  model.update();
   int n = experimental::Cuts::cuts.size();
-
   pathMap leafToRootPaths;
-
-  auto retrieveAndSearchGRBVar = [&](const std::string &node,
-                                     const std::string &variableType,
-                                     VariableSearcher &searcher) -> GRBVar {
-    std::string channelName = retrieveChannelName(node, variableType).str();
-    return searcher.variableIncludes(channelName, nodeToGRB, node);
-  };
-
-#pragma omp parallel for schedule(guided)
+  // #pragma omp parallel for schedule(guided)
   for (int i = 0; i < n; ++i) {
     // Create local constraints for each thread
-    std::list<GrbConst> localConstraints;
-    std::list<GrbConst> localConstraintsEqual;
+    // std::list<GrbConst> localConstraints;
+    // std::list<GrbConst> localConstraintsEqual;
     // Loop over each subject graph edge
     auto it = std::next(experimental::Cuts::cuts.begin(), i);
-    const auto &key = it->first;
+    auto *key = it->first;
     auto &val = it->second;
+    
+    llvm::errs() << "Adding constraints for node: " << key->str() << "\n";
 
     // Retrieve the Gurobi variable corresponding to the subject graph edge. If
     // the edge corresponds to a dataflow channel, then we need to retrieve the
     // variable corresponding to the pathIn of the channel.
-    GRBVar nodeVar = retrieveAndSearchGRBVar(key, "pathIn", pathInSearcher);
-    std::set<std::string> fanIns = anchorsRemoved.getFanins(key);
-
+    std::set<experimental::Node *> fanIns = key->getFanins();
+    GRBVar &nodeVar = key->gurobiVars->tIn;
     if (fanIns.size() == 1) {
       // if a node has single fanin, then it is not mapped to LUTs. The delay of
       // the node is equal to the delay of the fanin.
       // No cut should be selected for these nodes, the other cuts are present
       // for the correct cut enumeration.
-      GRBVar faninVar =
-          retrieveAndSearchGRBVar(*fanIns.begin(), "pathOut", pathOutSearcher);
-      // model.addConstr(nodeVar == faninVar, "single_fanin_delay");
-      localConstraintsEqual.emplace_back(nodeVar, faninVar, 0);
+      GRBVar &faninVar = (*fanIns.begin())->gurobiVars->tOut;
+      llvm::errs() << "Adding single fanin delay constraint for fanin: "
+                   << (*fanIns.begin())->str() << "\n";
+      model.addConstr(nodeVar == faninVar, "single_fanin_delay");
+      // localConstraintsEqual.emplace_back(nodeVar, faninVar, 0);
       continue;
     }
 
@@ -707,40 +748,45 @@ void MAPBUFBuffers::setup() {
         // it's the trivial cut. The LUT is created by the fanins of the root
         // node.
         for (auto &fanIn : fanIns) {
-          GRBVar faninVar =
-              retrieveAndSearchGRBVar(fanIn, "pathOut", pathOutSearcher);
-          // model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
-          //                     faninVar + lutDelay,
-          //                 "trivial_cut_delay");
-          localConstraints.emplace_back(nodeVar +
-                                            (1 - cutSelectionVar) * bigConstant,
-                                        faninVar + lutDelay, 1);
+          GRBVar &faninVar = fanIn->gurobiVars->tOut;
+          llvm::errs() << "Adding trivial cut delay constraint for fanin: "
+                       << fanIn->str() << "\n";
+
+          model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
+                              faninVar + lutDelay,
+                          "trivial_cut_delay");
+          // localConstraints.emplace_back(nodeVar +
+          //                                   (1 - cutSelectionVar) *
+          //                                   bigConstant,
+          //                               faninVar + lutDelay, 1);
         }
         continue;
       }
 
-      for (auto &leaf : cut.leaves) {
+      for (auto *leaf : cut.leaves) {
         // Loop over each leaf of the cut
 
         // Retrieve the Gurobi variable corresponding to the leaf. If the leaf
         // is a dataflow channel, then retrieve the pathOut variable of the
         // channel.
-        GRBVar leafVar =
-            retrieveAndSearchGRBVar(leaf, "pathOut", pathOutSearcher);
+        GRBVar &leafVar = leaf->gurobiVars->tOut;
 
+        llvm::errs() << "Adding delay propagation constraint for fanin: "
+                     << leaf->str() << " and leaf: " << leaf->str() << "\n";
         // Add the delay propagation constraint
-        // model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
-        //                     leafVar + lutDelay,
-        //                 "delay_propagation");
+        model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
+                            leafVar + lutDelay,
+                        "delay_propagation");
 
-        localConstraints.emplace_back(nodeVar +
-                                          (1 - cutSelectionVar) * bigConstant,
-                                      leafVar + lutDelay, 2);
+        // localConstraints.emplace_back(nodeVar +
+        //                                   (1 - cutSelectionVar) *
+        //                                   bigConstant,
+        //                               leafVar + lutDelay, 2);
 
         // Get the path from the leaf to the root
-        std::vector<std::string> path;
+        std::vector<experimental::Node *> path;
 
-#pragma omp critical
+        // #pragma omp critical
         {
           path = getOrCreateLeafToRootPath(key, leaf, leafToRootPaths,
                                            anchorsRemoved);
@@ -748,42 +794,44 @@ void MAPBUFBuffers::setup() {
         for (auto &nodePath : path) {
           // Loop over edges in the path from the leaf to the root. Add cut
           // selection conflict constraints for channels that are on the path.
-          std::string nodeWithChannel =
-              retrieveChannelName(nodePath, "buffer").str();
-          auto bufferVars = bufSearcher.variableIncludes(nodeWithChannel);
-          if (nodeWithChannel != nodePath && bufferVars) {
-            // No buffer can be placed on a channel if the chosen cut covers
-            // that channel.
-
-            // model.addConstr(1 >= bufferVars.value() + cutSelectionVar,
-            //                 "cut_selection_conflict");
-            localConstraints.emplace_back(
-                1, bufferVars.value() + cutSelectionVar, 3);
+          if (nodePath->gurobiVars->bufferVar.has_value()) {
+            llvm::errs()
+                << "Adding cut selection conflict constraint for node: "
+                << key->str() << " and leaf: " << leaf->str() << "\n";
+            model.addConstr(1 >= nodePath->gurobiVars->bufferVar.value() +
+                                     cutSelectionVar,
+                            "cut_selection_conflict");
+            // localConstraints.emplace_back(
+            //     1, nodePath->gurobiVars.bufferVar.value() + cutSelectionVar,
+            //     3);
           }
         }
       }
     }
-#pragma omp critical
-    {
-      // Gurobi does not allow to modify the model from multiple threads, so we need to add the constraints in a critical section
-      constraints.splice(constraints.end(), localConstraints);
-      constraintsEqual.splice(constraintsEqual.end(), localConstraintsEqual);
-    }
+    // #pragma omp critical
+    //     {
+    //       // Gurobi does not allow to modify the model from multiple threads,
+    //       so we
+    //       // need to add the constraints in a critical section
+    //       constraints.splice(constraints.end(), localConstraints);
+    //       constraintsEqual.splice(constraintsEqual.end(),
+    //       localConstraintsEqual);
+    //     }
   }
 
   model.update();
 
-  for (auto &constraint : constraints) {
-    model.addConstr(
-        constraint.lhs >= constraint.rhs,
-        static_cast<std::string>(getConstraintName(constraint.constraintType)));
-  }
+  // for (auto &constraint : constraints) {
+  //   model.addConstr(
+  //       constraint.lhs >= constraint.rhs,
+  //       static_cast<std::string>(getConstraintName(constraint.constraintType)));
+  // }
 
-  for (auto &constraint : constraintsEqual) {
-    model.addConstr(
-        constraint.lhs == constraint.rhs,
-        static_cast<std::string>(getConstraintName(constraint.constraintType)));
-  }
+  // for (auto &constraint : constraintsEqual) {
+  //   model.addConstr(
+  //       constraint.lhs == constraint.rhs,
+  //       static_cast<std::string>(getConstraintName(constraint.constraintType)));
+  // }
 
   SmallVector<CFDFC *> cfdfcs;
   for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
@@ -795,8 +843,7 @@ void MAPBUFBuffers::setup() {
     addUnitThroughputConstraints(*cfdfc);
   }
   addObjective(allChannels, cfdfcs);
-
-
+  model.set(GRB_IntParam_DualReductions, 0);
   llvm::errs() << "model marked ready to optimize"
                << "\n";
   markReadyToOptimize();

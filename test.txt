@@ -1,0 +1,45 @@
+[INFO] Compiled source to affine
+[INFO] Ran memory analysis
+[INFO] Compiled affine to scf
+[INFO] Compiled scf to cf
+[INFO] Applied standard transformations to cf
+[INFO] Applied Dynamatic transformations to cf
+[INFO] Compiled cf to handshake
+[INFO] Applied transformations to handshake
+[INFO] Built kernel for profiling
+[INFO] Ran kernel for profiling
+[INFO] Profiled cf-level
+ABC command line: "read_blif /home/oyasar/dynamatic/integration-test/fir/out/./mapbuf/./yosys_blif.blif;
+        strash;
+        rewrite;
+        b;
+        refactor;
+        b;
+        rewrite;
+        b;
+        refactor;
+        b;
+        rewrite;
+        b;
+        refactor;
+        b;
+        rewrite;
+        b;
+        refactor;
+        b;
+        rewrite;
+        b;
+        refactor;
+        b;
+        rewrite;
+        b;
+        refactor;
+        b;
+        write_blif /home/oyasar/dynamatic/integration-test/fir/out/./mapbuf/./anchored.blif".
+
+Hierarchy reader converted 7 instances of blackboxes.
+did not find any constraints
+[INFO] Running smart buffer placement with CP = 4.200 and algorithm = 'mapbuf'
+[INFO] Placed smart buffers
+[FATAL] Failed to canonicalize Handshake
+dynamatic> [Kdynamatic> [Kdynamatic> [Kdynamatic> [Kdynamatic> [Kdynamatic> [Kdynamatic> [Kdynamatic> [Kdynamatic> [Kdynamatic> [Kdynamatic> ex^C

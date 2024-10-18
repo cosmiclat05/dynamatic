@@ -92,11 +92,11 @@ private:
 
   void addBlackboxConstraints();
 
-  void
-  addClockPeriodConstraintsNodes(experimental::BlifData &blif,
-                            std::unordered_map<std::string, GRBVar> &nodeToGRB);
+  void addClockPeriodConstraintsNodes(
+      experimental::BlifData &blif);
 
-  void addClockPeriodConstraintsChannels(Value channel, SignalType signal);
+  void addClockPeriodConstraintsChannels(Value channel, SignalType signal,
+                                         experimental::BlifData &blif);
 
   void retrieveFPGA20Constraints(GRBModel &model);
 

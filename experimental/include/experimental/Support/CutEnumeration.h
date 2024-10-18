@@ -14,6 +14,7 @@
 #ifndef EXPERIMENTAL_SUPPORT_CUT_ENUMERATION_H
 #define EXPERIMENTAL_SUPPORT_CUT_ENUMERATION_H
 
+#include "BlifReader.h"
 #include "dynamatic/Support/LLVM.h"
 #include "gurobi_c++.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -21,7 +22,6 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Region.h"
 #include "mlir/Pass/Pass.h"
-#include "BlifReader.h"
 
 #include <fstream>
 #include <set>
@@ -38,71 +38,87 @@ class Cut {
 public:
   GRBVar nodeVar;
   GRBVar cutSelection;
-  std::string root;
-  std::set<std::string> leaves;
+  Node *root;
+  std::set<Node *> leaves;
   int depth;
 
-  Cut(std::string root, int depth = 0) : root(root), depth(depth) {};
-  Cut(std::string root, std::string leaf, int depth = 0) : root(root), leaves(std::set<std::string>{leaf}), depth(depth) {}; //for trivial cuts
-  Cut(std::string root, std::set<std::string> leaves, int depth = 0) : root(root), leaves(leaves), depth(depth) {};
+  Cut(Node *root, int depth = 0) : root(root), depth(depth){};
+  Cut(Node *root, Node *leaf, int depth = 0)
+      : root(root), leaves({leaf}), depth(depth){}; // for trivial cuts
+  Cut(Node *root, std::set<Node *> leaves, int depth = 0)
+      : root(root), leaves(leaves), depth(depth){};
 
-  void addLeaf(const std::string &leaf) { leaves.insert(leaf); }
+  void addLeaf(Node *leaf) { leaves.insert(leaf); }
 
-  const std::string &getNode() const { return root; }
+  Node *getNode() { return root; }
 
-  const std::set<std::string> &getLeaves() const { return leaves; }
+  std::set<Node *> getLeaves() const { return leaves; }
 
-  void setLeaves(std::set<std::string>& leaves){
-      this->leaves = leaves;
+  void setLeaves(std::set<Node *> &leaves) { this->leaves = leaves; }
+
+  void addLeaves(std::set<Node *> &leaves) {
+    this->leaves.insert(leaves.begin(), leaves.end());
   }
 
-  void addLeaves(std::set<std::string>& leaves){
-      this->leaves.insert(leaves.begin(), leaves.end());
-  }
+  Node *getRoot() { return root; }
 
-  std::string getRoot() const{
-      return root;
-  }
+  int getDepth() { return depth; }
+};
 
-  int getDepth() const{
-      return depth;
+struct NodePtrHash {
+  std::size_t operator()(const Node *node) const {
+    return std::hash<std::string>()(node->getName()); // Hash the name
+  }
+};
+
+struct NodePtrEqual {
+  bool operator()(const Node *lhs, const Node *rhs) const {
+    return lhs->getName() == rhs->getName();
   }
 };
 
 class Cuts {
 public:
-  static inline std::unordered_map<std::string, std::vector<Cut>> cuts;
+  static inline std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
+                                   NodePtrEqual>
+      cuts;
   experimental::BlifData blif;
   int lutSize{};
   int maxExpansion{};
 
-  Cuts(BlifData& blif, int lutSize, int maxExpansion) : blif(blif), lutSize(lutSize), maxExpansion(maxExpansion){};
-  
-  std::vector<Cut> enumerateCuts(const std::string& node, const std::vector<std::vector<Cut>>& faninCuts, int lutSize);
-  std::unordered_map<std::string, std::vector<Cut>> computeAllCuts();
-  std::unordered_map<std::string, std::vector<Cut>> cutless();
-  std::unordered_map<std::string, std::vector<Cut>> cutlessReal();
+  Cuts(BlifData &blif, int lutSize, int maxExpansion)
+      : blif(blif), lutSize(lutSize), maxExpansion(maxExpansion){};
 
-  void runCutAlgos(bool computeAllCuts, bool cutless, bool cutlessReal, bool anchors);
+  std::vector<Cut> enumerateCuts(Node *node,
+                                 const std::vector<std::vector<Cut>> &faninCuts,
+                                 int lutSize);
+  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+  computeAllCuts();
+  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+  cutless();
+  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+  cutlessReal();
+
+  void runCutAlgos(bool computeAllCuts, bool cutless, bool cutlessReal,
+                   bool anchors);
   void readFromFile(const std::string &filename);
   static void printCuts(std::string filename);
 
-  void addCut(const std::string &node, const Cut &newCut) {
+  void addCut(Node *node, const Cut &newCut) {
     if (cuts.find(node) == cuts.end()) {
       cuts[node] = std::vector<Cut>();
     }
     cuts[node].push_back(newCut);
   }
 
-  std::vector<Cut> getCuts(const std::string &node) {
+  std::vector<Cut> getCuts(Node *node) {
     if (cuts.find(node) != cuts.end()) {
       return cuts[node];
     }
     return std::vector<Cut>();
   }
- 
+
   // Method to read from file and populate cuts
-  
 };
 
 } // namespace experimental

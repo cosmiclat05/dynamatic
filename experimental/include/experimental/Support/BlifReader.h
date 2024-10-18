@@ -22,7 +22,8 @@
 #include "mlir/IR/Region.h"
 #include "mlir/Pass/Pass.h"
 
-#include <fstream> // Add this line
+#include <boost/functional/hash/extensions.hpp>
+#include <functional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -33,160 +34,207 @@ using namespace mlir;
 namespace dynamatic {
 namespace experimental {
 
+class BlifData;
+
+struct MILPVarsSubjectGraph {
+  GRBVar tIn;
+  GRBVar tOut;
+  std::optional<GRBVar> bufferVar;
+};
+
+// Node class to encapsulate node properties
+class Node {
+private:
+  std::string name;
+  BlifData *parent;
+  bool isPrimaryInputBool = false;
+  bool isPrimaryOutputBool = false;
+  bool isInputBool = false;
+  bool isOutputBool = false;
+  bool isLatchInputBool = false;
+  bool isLatchOutputBool = false;
+  bool isConstZeroBool = false;
+  bool isConstOneBool = false;
+  std::string function;
+  std::set<Node *> fanins;
+  std::set<Node *> fanouts;
+
+public:
+  MILPVarsSubjectGraph* gurobiVars;
+  
+  Node() = default;
+  Node(const std::string &name, BlifData *parent)
+      : name(name), parent(parent), gurobiVars(new MILPVarsSubjectGraph()) {}
+
+  Node &operator=(const Node &other) {
+    if (this == &other) {
+      // Handle self-assignment
+      return *this;
+    }
+
+    // Copy the primitive types and strings
+    name = other.name;
+    parent = other.parent; // Shallow copy (depends on ownership)
+    isPrimaryInputBool = other.isPrimaryInputBool;
+    isPrimaryOutputBool = other.isPrimaryOutputBool;
+    isInputBool = other.isInputBool;
+    isOutputBool = other.isOutputBool;
+    isLatchInputBool = other.isLatchInputBool;
+    isLatchOutputBool = other.isLatchOutputBool;
+    isConstZeroBool = other.isConstZeroBool;
+    isConstOneBool = other.isConstOneBool;
+    function = other.function;
+    gurobiVars = other.gurobiVars;
+
+    // Clear and copy the fanins and fanouts sets (deep copy of pointers)
+    fanins.clear();
+    for (auto *nodePtr : other.fanins) {
+      fanins.insert(nodePtr); // Copy pointers, not the objects themselves
+    }
+
+    fanouts.clear();
+    for (auto *nodePtr : other.fanouts) {
+      fanouts.insert(nodePtr); // Copy pointers, not the objects themselves
+    }
+
+    // Return *this to allow chain assignment
+    return *this;
+  }
+
+  ~Node() {
+    delete gurobiVars;
+    fanins.clear();
+    fanouts.clear();
+  }
+
+  const std::string &getName() const { return name; }
+  void setName(const std::string &newName);
+  void setPrimaryInput(bool value) { isPrimaryInputBool = value; }
+  void setPrimaryOutput(bool value) { isPrimaryOutputBool = value; }
+  void setInput(bool value) { isInputBool = value; }
+  void setOutput(bool value) { isOutputBool = value; }
+  void setLatchInput(bool value) { isLatchInputBool = value; }
+  void setLatchOutput(bool value) { isLatchOutputBool = value; }
+  void setConstZero(bool value) { isConstZeroBool = value; }
+  void setConstOne(bool value) { isConstOneBool = value; }
+  void setFunction(const std::string &func) { function = func; }
+
+  bool isInput() const { return isInputBool; }
+  bool isOutput() const { return isOutputBool; }
+  bool isPrimaryInput() const { return isPrimaryInputBool; }
+  bool isPrimaryOutput() const { return isPrimaryOutputBool; }
+  bool isLatchInput() const { return isLatchInputBool; }
+  bool isLatchOutput() const { return isLatchOutputBool; }
+  bool isConstZero() const { return isConstZeroBool; }
+  bool isConstOne() const { return isConstOneBool; }
+  const std::string &getFunction() const { return function; }
+
+  std::set<Node *> getFanins() const { return fanins; }
+  std::set<Node *> getFanouts() { return fanouts; }
+
+  void addFanin(Node *node) { fanins.insert(node); }
+  void addFanout(Node *&node) { fanouts.insert(node); }
+
+  bool operator==(const Node &other) const { return name == other.name; }
+  bool operator==(const Node *other) const { return name == other->name; }
+  bool operator!=(const Node &other) const { return name != other.name; }
+  bool operator<(const Node &other) const { return name < other.name; }
+  bool operator<(const Node *other) const { return name < other->name; }
+  bool operator>(const Node &other) const { return name > other.name; }
+  std::string str() { return name; }
+
+  friend class BlifData;
+};
+
+struct PointerCompare {
+  bool operator()(const Node *lhs, const Node *rhs) const {
+    return lhs->getName() < rhs->getName();
+  }
+};
+
 class BlifData {
 private:
-  std::string m_modulename;
-  std::set<std::string> m_inputs;
-  std::set<std::string> m_outputs;
-  std::set<std::string> nodes;
-  std::set<std::string> m_latchInputs;
-  std::set<std::string> m_latchOutputs;
-  std::unordered_map<std::string, std::string> m_latches;
-  std::set<std::string> m_constZeroNodes;
-  std::set<std::string> m_constOneNodes;
-
-  std::unordered_map<std::string, std::set<std::string>> m_nodeFanins;
-  std::unordered_map<std::string, std::set<std::string>> m_nodeFanouts;
-  std::unordered_map<std::string, std::string> m_nodeFunctions;
-
-  std::vector<std::string> m_nodesTopologicalOrder;
-
-  std::unordered_map<std::string, std::set<std::string>> m_submodules;
-
-  std::set<std::string> m_primaryInputs;
-  std::set<std::string> m_primaryOutputs;
+  std::string moduleName;
+  std::unordered_map<std::string, Node *> nodes;
+  std::vector<Node *> nodesTopologicalOrder;
+  std::unordered_map<Node *, Node *, boost::hash<Node *>> latches;
+  std::unordered_map<std::string, std::set<std::string>> submodules;
 
 public:
   BlifData() = default;
 
+  void addLatch(Node *input, Node *output) { latches[input] = output; }
+
+  Node *getNodeByName(const std::string &name) {
+    auto it = nodes.find(name);
+    if (it != nodes.end()) {
+      return it->second;
+    }
+    return nullptr;
+  }
+
+  Node *createNode(const std::string &name) {
+    if (nodes.find(name) != nodes.end()) {
+      return nodes[name]; // Return existing node if name is already used
+    }
+    nodes[name] = new Node(name, this);
+    return nodes[name];
+  }
+
+  void renameNode(const std::string &oldName, const std::string &newName) {
+    auto it = nodes.find(oldName);
+    if (it != nodes.end()) {
+      auto *node = it->second;
+      nodes.erase(it);
+      node->name = newName;
+      nodes[newName] = node;
+    }
+  }
+
+  std::set<Node *> getPrimaryInputs() {
+    std::set<Node *> result;
+    for (const auto &pair : nodes) {
+      if (pair.second->isPrimaryInput()) {
+        result.insert(pair.second);
+      }
+    }
+    return result;
+  }
+
+  std::set<Node *> getPrimaryOutputs() {
+    std::set<Node *> result;
+    for (const auto &pair : nodes) {
+      if (pair.second->isPrimaryOutput()) {
+        result.insert(pair.second);
+      }
+    }
+    return result;
+  }
+
+  std::vector<Node *> getNodesInOrder() { return nodesTopologicalOrder; }
+
   void setModuleName(const std::string &moduleName) {
-    m_modulename = moduleName;
+    this->moduleName = moduleName;
   }
-
-  void addInput(const std::string &input) { m_inputs.insert(input); }
-
-  void addOutput(const std::string &output) { m_outputs.insert(output); }
-
-  void addNodes(const std::string &node) { nodes.insert(node); }
-
-  void addRegInput(const std::string &latchInput) {
-    m_latchInputs.insert(latchInput);
-  }
-
-  void addRegOutput(const std::string &latchOutput) {
-    m_latchOutputs.insert(latchOutput);
-  }
-
-  void addLatch(const std::string &latchInput, const std::string &latchOutput) {
-    m_latches[latchInput] = latchOutput;
-  }
-
-  void addConstZeroNode(const std::string &node) {
-    m_constZeroNodes.insert(node);
-  }
-
-  void addConstOneNode(const std::string &node) {
-    m_constOneNodes.insert(node);
-  }
-
-  void addNodeFanins(const std::string &node,
-                     const std::set<std::string> &fanins) {
-    m_nodeFanins[node] = fanins;
-  }
-
-  void addNodeFanouts(const std::string &node,
-                      const std::set<std::string> &fanouts) {
-    m_nodeFanouts[node] = fanouts;
-  }
-
-  void addNodeFanout(const std::string &node,
-                     const std::string &fanout) {
-    m_nodeFanouts[node].insert(fanout);
-  }
-
-  void addNodeFunctions(const std::string &node, const std::string &function) {
-    m_nodeFunctions[node] = function;
-  }
-
-  void addSubmodule(const std::string &submodule,
-                    const std::set<std::string> &signals) {
-    m_submodules[submodule] = signals;
-  }
-
-  bool isPrimaryInput(const std::string &input) const {
-    return m_primaryInputs.count(input) > 0;
-  }
-
-  bool isPrimaryOutput(const std::string &output) const {
-    return m_primaryOutputs.count(output) > 0;
-  }
-
-  bool isInput(const std::string &input) const {
-    return m_inputs.count(input) > 0;
-  }
-
-  bool isOutput(const std::string &output) const {
-    return m_outputs.count(output) > 0;
-  }
-
-  bool isRegInput(const std::string &regInput) const {
-    return m_latchInputs.count(regInput) > 0;
-  }
-
-  bool isRegOutput(const std::string &regOutput) const {
-    return m_latchOutputs.count(regOutput) > 0;
-  }
-
-  bool isConstantNode(const std::string &node) const {
-    return m_constZeroNodes.count(node) > 0 || m_constOneNodes.count(node) > 0;
-  }
-
+  void traverseUtil(Node *node, std::set<Node *> &visitedNodes);
+  void traverseNodes();
   void printModuleInfo();
 
-  void traverseNodes();
-
-  void traverseUtil(const std::string &node,
-                    std::set<std::string> &visitedNodes);
-
-  std::set<std::string> getPrimaryInputs() const;
-
-  std::set<std::string> getPrimaryOutputs() const;
-
-  std::set<std::string> getNodes() const;
-
-  std::set<std::string> getAllNodes() const{
-    return nodes;
-  }
-
-  std::set<std::string> getFanouts(const std::string &node) const {
-    if (m_nodeFanouts.count(node) > 0) {
-      return m_nodeFanouts.at(node);
-    } else {
-      return std::set<std::string>();
+  std::set<Node *> getAllNodes() {
+    std::set<Node *> result;
+    for (auto &pair : nodes) {
+      result.insert(pair.second);
     }
+    return result;
   }
 
-  std::set<std::string> getFanins(const std::string &node) const {
-    if (m_nodeFanins.count(node) > 0) {
-      return m_nodeFanins.at(node);
-    } 
-    else {
-      return std::set<std::string>();
-    }
-  }
-  
-  std::vector<std::string> findPath(const std::string &start,
-                                    const std::string &end);
+  std::vector<Node *> findPath(Node *start, Node *end);
 
-  std::vector<std::string> getNodesInOrder() const {
-    return m_nodesTopologicalOrder;
-  }
+  std::set<Node *> findNodesWithLimitedWavyInputs(size_t limit,
+                                                  std::set<Node *> &wavyLine);
 
-  std::set<std::string> findNodesWithLimitedWavyInputs(size_t limit, std::set<std::string>& wavyLine);
-
-  std::set<std::string> findWavyInputsOfNode(const std::string &node, std::set<std::string>& wavyLine);
+  std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine);
 };
-
 
 class BlifParser {
 public:

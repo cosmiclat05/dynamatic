@@ -2,4 +2,4 @@ set-dynamatic-path  .
 
 set-src             integration-test/fir/fir.c
 
-compile --buffer-algorithm fpga20
+compile --buffer-algorithm mapbuf

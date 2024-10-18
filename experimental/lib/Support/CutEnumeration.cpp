@@ -31,7 +31,7 @@ void Cuts::readFromFile(const std::string &filename) {
   }
 
   std::string line;
-  std::string node;
+  std::string nodeName;
   std::string leaf;
   int numberOfCuts = 0;
   int cutSize = 0;
@@ -41,10 +41,11 @@ void Cuts::readFromFile(const std::string &filename) {
       continue;
     if (line[0] != '\t') {
       std::istringstream iss(line);
-      iss >> node >> numberOfCuts;
+      iss >> nodeName >> numberOfCuts;
       for (int i = 0; i < numberOfCuts; i++) {
         std::getline(file, line);
         if (line.substr(0, 5) == "Cut #") {
+          Node *node = blif.getNodeByName(nodeName);
           Cut newCut(node);
           std::istringstream iss(line);
           std::string dummy;
@@ -52,7 +53,7 @@ void Cuts::readFromFile(const std::string &filename) {
           for (int j = 0; j < cutSize; ++j) {
             std::getline(file, line);
             leaf = line.substr(1); // Remove leading tab
-            newCut.addLeaf(leaf);
+            newCut.addLeaf(blif.getNodeByName(leaf));
           }
           addCut(node, newCut);
         } else {
@@ -83,8 +84,7 @@ bool isSubset(const std::set<T> &setA, const std::set<T> &setB) {
 }
 
 std::vector<Cut>
-Cuts::enumerateCuts(const std::string &node,
-                    const std::vector<std::vector<Cut>> &faninCuts,
+Cuts::enumerateCuts(Node *node, const std::vector<std::vector<Cut>> &faninCuts,
                     int lutSize) {
 
   std::list<Cut> cutsList;
@@ -94,17 +94,17 @@ Cuts::enumerateCuts(const std::string &node,
   int depth = 0;
   int maxDepth = 0;
 
-  for (const auto &cut1 : cuts1) {
+  for (auto &cut1 : cuts1) {
     std::list<Cut> localCuts;
-    for (const auto &cut2 : cuts2) {
-      std::set<std::string> leaves1 = cut1.getLeaves();
-      std::set<std::string> leaves2 = cut2.getLeaves();
+    for (auto &cut2 : cuts2) {
+      std::set<Node *> leaves1 = cut1.getLeaves();
+      std::set<Node *> leaves2 = cut2.getLeaves();
       // get max depth of cut1 and cut2
       depth = std::max(cut1.getDepth(), cut2.getDepth());
       if (depth > maxDepth) {
         maxDepth = depth;
       }
-      std::set<std::string> merge = leaves1;
+      std::set<Node *> merge = leaves1;
       merge.insert(leaves2.begin(), leaves2.end());
       Cut mergedCut(node, merge, depth);
       if (mergedCut.getLeaves().size() <= lutSize + maxExpansion) {
@@ -117,9 +117,9 @@ Cuts::enumerateCuts(const std::string &node,
   std::vector<Cut> cuts(cutsList.begin(), cutsList.end());
 
   std::vector<Cut> cutsPruned;
-  for (const auto &cut : cuts) {
+  for (auto &cut : cuts) {
     bool isSubsetOfAnother = false;
-    for (const auto &otherCut : cuts) {
+    for (auto &otherCut : cuts) {
       if (cut.getLeaves() == otherCut.getLeaves()) {
         continue;
       }
@@ -133,23 +133,22 @@ Cuts::enumerateCuts(const std::string &node,
     }
   }
 
-  std::sort(cutsPruned.begin(), cutsPruned.end(),
-            [](const Cut &a, const Cut &b) {
-              if (a.getDepth() == b.getDepth()) {
-                return a.getLeaves().size() > b.getLeaves().size();
-              }
-              return a.getDepth() > b.getDepth();
-            });
+  std::sort(cutsPruned.begin(), cutsPruned.end(), [](Cut &a, Cut &b) {
+    if (a.getDepth() == b.getDepth()) {
+      return a.getLeaves().size() > b.getLeaves().size();
+    }
+    return a.getDepth() > b.getDepth();
+  });
 
   std::vector<Cut> cutsExceedingLutSize;
-  for (const auto &cut : cutsPruned) {
+  for (auto &cut : cutsPruned) {
     if (cut.getLeaves().size() > lutSize) {
       cutsExceedingLutSize.push_back(cut);
     }
   }
 
   std::vector<Cut> cutsWithLimitedLeaves;
-  for (const auto &cut : cutsPruned) {
+  for (auto &cut : cutsPruned) {
     if (cut.getLeaves().size() <= lutSize) {
       cutsWithLimitedLeaves.push_back(cut);
     }
@@ -166,7 +165,7 @@ Cuts::enumerateCuts(const std::string &node,
   }
 
   cutsMerged.erase(std::unique(cutsMerged.begin(), cutsMerged.end(),
-                               [](const Cut &a, const Cut &b) {
+                               [](Cut &a, Cut &b) {
                                  return a.getLeaves() == b.getLeaves();
                                }),
                    cutsMerged.end());
@@ -177,132 +176,92 @@ Cuts::enumerateCuts(const std::string &node,
   return cutsMerged;
 }
 
-std::unordered_map<std::string, std::vector<Cut>> Cuts::cutlessReal(){
+std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+Cuts::cutless() {
+  int n = 0;
+  std::set<Node *> currentWavyLine = blif.getPrimaryInputs();
+  std::set<Node *> nextWavyLine;
+  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+      cutlessCuts;
 
-  std::unordered_map<std::string, std::vector<Cut>> cutlessCuts;
-  std::set<std::string> primaryInputs = blif.getPrimaryInputs();
-  for (auto& pi : primaryInputs) {
-    cutlessCuts[pi].emplace_back(pi, pi, 0);
+  while (true) {
+    nextWavyLine = blif.findNodesWithLimitedWavyInputs(6, currentWavyLine);
+    if (nextWavyLine.size() == currentWavyLine.size()) {
+      break;
+    }
+
+    for (auto *node : nextWavyLine) {
+      cutlessCuts[node].emplace_back(
+          node, blif.findWavyInputsOfNode(node, currentWavyLine), n);
+    }
+
+    n++;
+    // currentWavyLine = nextWavyLine;
+    currentWavyLine.insert(nextWavyLine.begin(), nextWavyLine.end());
+    llvm::errs() << n << " " << currentWavyLine.size() << "\n";
   }
 
-  for (const auto &node : blif.getNodesInOrder()) {
-    if (blif.isPrimaryInput(node)) {
-      continue;
-    }
+  for (auto &[node, cuts] : cutlessCuts) {
+    cuts.erase(std::unique(cuts.begin(), cuts.end(),
+                           [](Cut &a, Cut &b) {
+                             const auto &leavesA = a.getLeaves();
+                             const auto &leavesB = b.getLeaves();
 
-    auto fanins = blif.getFanins(node);
+                             // Compare the sizes first as an optimization
+                             if (leavesA.size() != leavesB.size()) {
+                               return false;
+                             }
 
-    if (fanins.size() == 1){
-      cutlessCuts[node] = cutlessCuts[*fanins.begin()];
-    }
-
-    else if (fanins.size() == 2){
-      auto node0 = *fanins.begin();
-      auto node1 = *std::next(fanins.begin(), 1);
-      auto levelNode0 = cutlessCuts[node0][0].getDepth();
-      auto levelNode1 = cutlessCuts[node1][0].getDepth();
-
-      int level = std::max(levelNode0, levelNode1);
-      if (level == 0)
-        level = 1;
-
-      std::set <std::string> leaves0;
-      std::set <std::string> leaves1;
-      if (levelNode0 == levelNode1){
-        leaves0 = cutlessCuts[node0][0].getLeaves();
-        leaves1 = cutlessCuts[node1][0].getLeaves();
-      }
-      else if (levelNode0 > levelNode1){
-        leaves0 = cutlessCuts[node0][0].getLeaves();
-        leaves1.insert(node1);
-      }
-      else if (levelNode0 < levelNode1){
-        leaves0.insert(node0);
-        leaves1 = cutlessCuts[node1][0].getLeaves();
-      }
-
-      std::set<std::string> merged = leaves0;
-      merged.insert(leaves1.begin(), leaves1.end());
-
-      if (merged.size() > lutSize){
-        merged.clear();
-        merged.insert(node0);
-        merged.insert(node1);
-        level += 1;
-      }
-      cutlessCuts[node].emplace_back(node, merged, level);
-    }
+                             // Compare elements in the set based on Node's name
+                             // strings
+                             return std::equal(
+                                 leavesA.begin(), leavesA.end(),
+                                 leavesB.begin(), leavesB.end(),
+                                 [](const Node *nodeA, const Node *nodeB) {
+                                   return nodeA->getName() == nodeB->getName();
+                                 });
+                           }),
+               cuts.end());
   }
+
   return cutlessCuts;
 }
 
-std::unordered_map<std::string, std::vector<Cut>> Cuts::cutless(){
-    int n = 0;
-    std::set<std::string> currentWavyLine = blif.getPrimaryInputs();
-    std::set<std::string> nextWavyLine;
-    std::unordered_map<std::string, std::vector<Cut>> cutlessCuts;
-
-    while (true) {
-        nextWavyLine = blif.findNodesWithLimitedWavyInputs(6, currentWavyLine);
-
-        if (nextWavyLine.size() == currentWavyLine.size()) {
-            break;
-        }
-
-        for (auto& node : nextWavyLine) {
-            cutlessCuts[node].emplace_back(node, blif.findWavyInputsOfNode(node, currentWavyLine), n);
-        }
-
-        n++;
-        //currentWavyLine = nextWavyLine;
-        currentWavyLine.insert(nextWavyLine.begin(), nextWavyLine.end());
-        llvm::errs() << n << " " << currentWavyLine.size() << "\n";
-    }
-
-    for (auto& [node, cuts] : cutlessCuts) {
-        cuts.erase(std::unique(cuts.begin(), cuts.end(), [](const Cut& a, const Cut& b) {
-            return a.getLeaves() == b.getLeaves();
-        }), cuts.end());
-    }
-  
-    return cutlessCuts;
-}
-
-
 // Usage in your main cut enumeration function
-std::unordered_map<std::string, std::vector<Cut>> Cuts::computeAllCuts() {
+std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+Cuts::computeAllCuts() {
+  // cuts = cutless();
+  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+      cutResults;
 
-  //cuts = cutless();
-  std::unordered_map<std::string, std::vector<Cut>> cutResults;
-
-  for (const auto &node : blif.getNodesInOrder()) {
-
-    if (blif.isPrimaryInput(node)) {
+  for (auto *node : blif.getNodesInOrder()) {
+    if (node->isPrimaryInput()) {
       cutResults[node].emplace_back(node, node, 0);
       continue;
     }
-    
-    auto fanins = blif.getFanins(node);
+
+    auto fanins = node->getFanins();
 
     if (fanins.size() == 1) {
-      for (auto& cuts : cutResults[*fanins.begin()]){
+      for (auto &cuts : cutResults[*fanins.begin()]) {
         cutResults[node].emplace_back(node, cuts.getLeaves(), cuts.getDepth());
       }
       continue;
     }
 
     if (fanins.size() == 2) {
-      std::set<std::string> insOfFanin1 = blif.getFanins(*fanins.begin());
-      std::set<std::string> insOfFanin2 =
-          blif.getFanins(*std::next(fanins.begin(), 1));
+      std::set<Node *> insOfFanin1 = (*fanins.begin())->getFanins();
+      std::set<Node *> insOfFanin2 =
+          (*std::next(fanins.begin(), 1))->getFanins();
 
       if ((insOfFanin1 == insOfFanin2) && (!insOfFanin1.empty())) {
-        for (auto& cuts : cutResults[*fanins.begin()]){
-          cutResults[node].emplace_back(node, cuts.getLeaves(), cuts.getDepth());
+        for (auto &cuts : cutResults[*fanins.begin()]) {
+          cutResults[node].emplace_back(node, cuts.getLeaves(),
+                                        cuts.getDepth());
         }
 
         int maxDepth = 0;
-        for (const auto &cut : cutResults[*fanins.begin()]) {
+        for (auto &cut : cutResults[*fanins.begin()]) {
           if (cut.getDepth() > maxDepth) {
             maxDepth = cut.getDepth();
           }
@@ -310,10 +269,10 @@ std::unordered_map<std::string, std::vector<Cut>> Cuts::computeAllCuts() {
         cutResults[node].emplace_back(node, node, maxDepth + 1);
         continue;
       }
-    } 
+    }
 
     std::vector<std::vector<Cut>> faninCuts;
-    for (const auto &fanin : fanins) {
+    for (auto &fanin : fanins) {
       faninCuts.push_back(cutResults[fanin]);
     }
 
@@ -322,103 +281,102 @@ std::unordered_map<std::string, std::vector<Cut>> Cuts::computeAllCuts() {
       continue;
     }
 
-    cutResults[node].insert(cutResults[node].end(), cutsEnumerated.begin(), cutsEnumerated.end());   
+    cutResults[node].insert(cutResults[node].end(), cutsEnumerated.begin(),
+                            cutsEnumerated.end());
   }
 
   for (auto &[node, cuts] : cutResults) {
 
-    std::sort(cuts.begin(), cuts.end(),
-          [](const Cut &a, const Cut &b) {
-            if (a.getDepth() == b.getDepth()) {
-              return a.getLeaves().size() < b.getLeaves().size();
-            }
-            return a.getDepth() < b.getDepth();
-          });
+    std::sort(cuts.begin(), cuts.end(), [](Cut &a, Cut &b) {
+      if (a.getDepth() == b.getDepth()) {
+        return a.getLeaves().size() < b.getLeaves().size();
+      }
+      return a.getDepth() < b.getDepth();
+    });
 
     cuts.erase(std::remove_if(cuts.begin(), cuts.end(),
-                              [this](const Cut &cut) {
+                              [this](Cut &cut) {
                                 return cut.getLeaves().size() > lutSize;
                               }),
                cuts.end());
 
     cuts.erase(std::unique(cuts.begin(), cuts.end(),
-                               [](const Cut &a, const Cut &b) {
-                                 return a.getLeaves() == b.getLeaves();
-                               }),
-                   cuts.end());
-
+                           [](Cut &a, Cut &b) {
+                             return a.getLeaves() == b.getLeaves();
+                           }),
+               cuts.end());
   }
 
-  return cutResults;  
+  return cutResults;
 }
 
-void Cuts::runCutAlgos(bool computeAllCutsBool, bool cutlessBool, bool cutlessRealBool, bool anchors){
+void Cuts::runCutAlgos(bool computeAllCutsBool, bool cutlessBool,
+                       bool cutlessRealBool, bool anchors) {
 
-  std::unordered_map<std::string, std::vector<Cut>> tempCuts;
+  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+      tempCuts;
 
-  if (computeAllCutsBool){
+  if (computeAllCutsBool) {
     auto cutsTemp1 = computeAllCuts();
-    for (const auto &pair : cutsTemp1) {
-      const std::string &node = pair.first;
-      const std::vector<Cut> &cutVector = pair.second;
-      tempCuts[node].insert(tempCuts[node].end(), cutVector.begin(), cutVector.end());
+    for (auto &pair : cutsTemp1) {
+      Node *node = pair.first;
+      std::vector<Cut> &cutVector = pair.second;
+      tempCuts[node].insert(tempCuts[node].end(), cutVector.begin(),
+                            cutVector.end());
     }
   }
-  if (cutlessBool){
+  if (cutlessBool) {
     auto cutsTemp1 = cutless();
-    for (const auto &pair : cutsTemp1) {
-      const std::string &node = pair.first;
-      const std::vector<Cut> &cutVector = pair.second;
-      tempCuts[node].insert(tempCuts[node].end(), cutVector.begin(), cutVector.end());
+    for (auto &pair : cutsTemp1) {
+      Node *node = pair.first;
+      std::vector<Cut> &cutVector = pair.second;
+      tempCuts[node].insert(tempCuts[node].end(), cutVector.begin(),
+                            cutVector.end());
     }
   }
-  if (cutlessRealBool){
-    auto cutsTemp1 = cutlessReal();
-    for (const auto &pair : cutsTemp1) {
-      const std::string &node = pair.first;
-      const std::vector<Cut> &cutVector = pair.second;
-      tempCuts[node].insert(tempCuts[node].end(), cutVector.begin(), cutVector.end());
-    }
-  }
+  // if (cutlessRealBool){
+  //   auto cutsTemp1 = cutlessReal();
+  //   for (auto &pair : cutsTemp1) {
+  //     Node* node = pair.first;
+  //     std::vector<Cut> &cutVector = pair.second;
+  //     tempCuts[node].insert(tempCuts[node].end(), cutVector.begin(),
+  //     cutVector.end());
+  //   }
+  // }
 
-  if (!anchors){
-    for (const auto &pair : tempCuts) {
-      const std::string &node = pair.first;
-      const std::vector<Cut> &cutVector = pair.second;
+  if (!anchors) {
+    for (auto &pair : tempCuts) {
+      Node *node = pair.first;
+      std::vector<Cut> &cutVector = pair.second;
       cuts[node].insert(cuts[node].end(), cutVector.begin(), cutVector.end());
     }
-  }
-  else{
+  } else {
     for (auto &pair : tempCuts) {
-      std::vector<std::string> namesToRemove = {"__data_anchors_out", "__data_anchors_in", "__anchors_out", "__anchors_in"};
-      std::function<std::string(std::string&)> removeAnchorsUtil = [namesToRemove](std::string& node) -> std::string {
-        for (auto& nameToRemove : namesToRemove){
-          size_t pos = node.find(nameToRemove);
+      std::vector<std::string> namesToRemove = {
+          "__data_anchors_out", "__data_anchors_in", "__anchors_out",
+          "__anchors_in"};
+      auto removeAnchorsUtil = [namesToRemove](Node *node) {
+        for (auto &nameToRemove : namesToRemove) {
+          size_t pos = node->str().find(nameToRemove);
           if (pos != std::string::npos) {
-            node.erase(pos, std::string(nameToRemove).length());
+            node->setName(
+                node->str().erase(pos, std::string(nameToRemove).length()));
             break;
           }
         }
-        return node;
       };
 
-      std::string node = pair.first;
+      Node *node = pair.first;
       std::vector<Cut> &cutVector = pair.second;
       removeAnchorsUtil(node);
 
       for (auto &cut : cutVector) {
-        std::string &root = cut.root;
+        Node *root = cut.root;
         removeAnchorsUtil(root);
-        
-        std::set<std::string> leaves = cut.leaves;
-        std::set<std::string> newLeaves;
-
-        for (auto leaf : leaves) {
-          std::string newLeaf = removeAnchorsUtil(leaf);
-          newLeaves.insert(leaf);
+        std::set<Node *> leaves = cut.leaves;
+        for (const auto &leaf : leaves) {
+          removeAnchorsUtil(leaf);
         }
-
-        cut.setLeaves(newLeaves);
       }
 
       cuts[node].insert(cuts[node].end(), cutVector.begin(), cutVector.end());
@@ -427,16 +385,81 @@ void Cuts::runCutAlgos(bool computeAllCutsBool, bool cutlessBool, bool cutlessRe
 
   for (auto &[node, cutVector] : cuts) {
     std::sort(cutVector.begin(), cutVector.end(),
-          [](const Cut &a, const Cut &b) {
-          if (a.getLeaves().size() == b.getLeaves().size()) {
-            return a.getLeaves() < b.getLeaves();
-          }
-          return a.getLeaves().size() < b.getLeaves().size();
-          });
+              [](const Cut &a, const Cut &b) {
+                // Get the sets first
+                const auto leavesA = a.getLeaves();
+                const auto leavesB = b.getLeaves();
 
+                // First compare by size
+                if (leavesA.size() != leavesB.size()) {
+                  return leavesA.size() < leavesB.size();
+                }
+
+                // Compare elements using set's iterators
+                auto itA = leavesA.begin();
+                auto itB = leavesB.begin();
+                while (itA != leavesA.end() && itB != leavesB.end()) {
+                  const Node *nodeA = *itA;
+                  const Node *nodeB = *itB;
+
+                  // Handle null pointers
+                  if (!nodeA || !nodeB) {
+                    if (nodeA == nodeB) {
+                      ++itA;
+                      ++itB;
+                      continue;
+                    }
+                    return !nodeA;
+                  }
+
+                  // Compare names
+                  if (nodeA->getName() != nodeB->getName()) {
+                    return nodeA->getName() < nodeB->getName();
+                  }
+
+                  ++itA;
+                  ++itB;
+                }
+                return false; // Sets are equal
+              });
+
+    // Remove duplicates
     cutVector.erase(std::unique(cutVector.begin(), cutVector.end(),
                                 [](const Cut &a, const Cut &b) {
-                                  return a.getLeaves() == b.getLeaves();
+                                  const auto leavesA = a.getLeaves();
+                                  const auto leavesB = b.getLeaves();
+
+                                  if (leavesA.size() != leavesB.size()) {
+                                    return false;
+                                  }
+
+                                  // Compare sets
+                                  auto itA = leavesA.begin();
+                                  auto itB = leavesB.begin();
+                                  while (itA != leavesA.end() &&
+                                         itB != leavesB.end()) {
+                                    const Node *nodeA = *itA;
+                                    const Node *nodeB = *itB;
+
+                                    // Handle null pointers
+                                    if (!nodeA || !nodeB) {
+                                      if (nodeA != nodeB) {
+                                        return false;
+                                      }
+                                      ++itA;
+                                      ++itB;
+                                      continue;
+                                    }
+
+                                    // Compare names
+                                    if (nodeA->getName() != nodeB->getName()) {
+                                      return false;
+                                    }
+
+                                    ++itA;
+                                    ++itB;
+                                  }
+                                  return true; // Sets are equal
                                 }),
                     cutVector.end());
   }
@@ -449,22 +472,22 @@ void Cuts::printCuts(std::string filename) {
     return;
   }
 
-  for (const auto &nodeCuts : cuts) {
-    const std::string &node = nodeCuts.first;
-    const std::vector<Cut> &cutList = nodeCuts.second;
+  for (auto &nodeCuts : cuts) {
+    Node *node = nodeCuts.first;
+    std::vector<Cut> &cutList = nodeCuts.second;
     std::size_t numCuts = cutList.size();
 
-    outFile << node << " " << numCuts << "\n";
+    outFile << node->str() << " " << numCuts << "\n";
 
     for (size_t i = 0; i < cutList.size(); ++i) {
-      const Cut &cut = cutList[i];
-      const std::set<std::string> &leaves = cut.getLeaves();
+      Cut &cut = cutList[i];
+      std::set<Node *> leaves = cut.getLeaves();
       std::size_t cutSize = leaves.size();
       outFile << "Cut #" << i << ": " << cutSize << " depth: " << cut.getDepth()
               << "\n";
 
-      for (const auto &leaf : leaves) {
-        outFile << '\t' << leaf << "\n";
+      for (auto leaf : leaves) {
+        outFile << '\t' << leaf->str() << "\n";
       }
     }
   }

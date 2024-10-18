@@ -35,6 +35,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <string>
 
+
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
@@ -491,6 +492,7 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
+#include "llvm/ADT/TypeSwitch.h"
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   // Read the operations' timing models from disk
   TimingDatabase timingDB(&getContext());
@@ -537,7 +539,36 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       }
     }
 
+auto getHandshakeTypeBitWidth = [](Type type) -> unsigned {
+  return llvm::TypeSwitch<Type, unsigned>(type)
+      .Case<handshake::ControlType>([](auto) { return 0; })
+      .Case<handshake::ChannelType>(
+          [](ChannelType channelType) { return channelType.getDataBitWidth(); })
+      .Case<IntegerType, FloatType>(
+          [](Type type) { return type.getIntOrFloatBitWidth(); })
+      .Default([](Type type) {
+        llvm::errs() << "unsupported type";
+        return 0;
+      });
+};
+
+
     if (algorithm == CUT_LOOPBACKS) {
+      // Iterate over all operations in the function
+      // funcOp.walk([&](Operation *op) {
+      //   llvm::errs() << "Operation: " << getUniqueName(op) << "\n";
+      //   for (Value input : op->getOperands()) {
+      //     llvm::errs() << "Input: " << input << ", Bitwidth: " << getHandshakeTypeBitWidth(input.getType()) 
+      //                  << ", Number of Channels: " << op->getNumOperands()
+      //                  << "\n";
+      //   }
+      //   for (Value output : op->getResults()) {
+      //     llvm::errs() << "Output: " << output << "Bitwidth: " << getHandshakeTypeBitWidth(output.getType())
+      //                  << ", Number of Channels: " << op->getNumResults()
+      //                  << "\n";
+      //   }
+      // });
+
       // Make sure that all the loops are cut by placing at least one buffer
       funcOp.walk([&](mlir::Operation *op) {
         for (Value result : op->getResults()) {
