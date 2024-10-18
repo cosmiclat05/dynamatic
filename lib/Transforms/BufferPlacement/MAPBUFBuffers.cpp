@@ -726,6 +726,7 @@ void MAPBUFBuffers::setup() {
     // the edge corresponds to a dataflow channel, then we need to retrieve the
     // variable corresponding to the pathIn of the channel.
     std::set<experimental::Node *> fanIns = key->getFanins();
+
     GRBVar &nodeVar = key->gurobiVars->tIn;
     if (fanIns.size() == 1) {
       // if a node has single fanin, then it is not mapped to LUTs. The delay of
