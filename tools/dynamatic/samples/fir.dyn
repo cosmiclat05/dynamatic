@@ -1,5 +1,6 @@
 set-dynamatic-path  .
 
 set-src             integration-test/fir/fir.c
-
+compile --buffer-algorithm cut-loopbacks
+write-hdl --hdl verilog
 compile --buffer-algorithm mapbuf

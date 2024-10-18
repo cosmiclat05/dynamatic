@@ -485,11 +485,11 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes(
         nodeVarIn = pathInVar.value();
         nodeVarOut = pathOutVar.value();
         nodeBufVar = bufferVar;
-        model.addConstr(nodeVarIn <= targetPeriod, "pathIn_period");
-        model.addConstr(nodeVarOut <= targetPeriod, "pathOut_period");
-        model.addConstr(
-            nodeVarOut - nodeVarIn + bigConstant * nodeBufVar.value() >= 0,
-            "buf_delay");
+        // model.addConstr(nodeVarIn <= targetPeriod, "pathIn_period");
+        // model.addConstr(nodeVarOut <= targetPeriod, "pathOut_period");
+        // model.addConstr(
+        //     nodeVarOut - nodeVarIn + bigConstant * nodeBufVar.value() >= 0,
+        //     "buf_delay");
       } else {
         // means it is an input
         nodeVarIn =
@@ -516,7 +516,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes(
 }
 
 void MAPBUFBuffers::addClockPeriodConstraintsChannels(
-    Value channel, SignalType signal, experimental::BlifData &blif) {
+    Value channel, SignalType signal) {
   // Add clock period constraints for each channel. The delay is not propagated
   // through the channel if a buffer is present.
   ChannelVars &channelVars = vars.channelVars[channel];
@@ -639,6 +639,10 @@ void MAPBUFBuffers::setup() {
     addChannelVars(channel, signals);
     addCustomChannelConstraints(channel);
     addChannelElasticityConstraints(channel, bufGroups);
+
+    for (SignalType signal : signals) {
+      addClockPeriodConstraintsChannels(channel, signal);
+    }
   }
 
   ChannelFilter channelFilter = [&](Value channel) -> bool {
