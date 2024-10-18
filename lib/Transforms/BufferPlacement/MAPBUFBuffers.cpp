@@ -407,7 +407,7 @@ void MAPBUFBuffers::addBlackboxConstraints() {
             {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.6}, {16, 0.7}, {32, 1.0}};
 
         std::map<unsigned int, double> compDelay = {
-            {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.8}, {16, 0.1}, {32, 1.2}};
+            {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.8}, {16, 1.0}, {32, 1.2}};
 
         double delay = 0.0;
 
@@ -515,8 +515,8 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes(
   }
 }
 
-void MAPBUFBuffers::addClockPeriodConstraintsChannels(
-    Value channel, SignalType signal) {
+void MAPBUFBuffers::addClockPeriodConstraintsChannels(Value channel,
+                                                      SignalType signal) {
   // Add clock period constraints for each channel. The delay is not propagated
   // through the channel if a buffer is present.
   ChannelVars &channelVars = vars.channelVars[channel];
@@ -530,10 +530,6 @@ void MAPBUFBuffers::addClockPeriodConstraintsChannels(
   model.addConstr(t2 <= targetPeriod, "pathOut_period");
   model.addConstr(t1 <= targetPeriod, "pathIn_period");
   model.addConstr(t2 - t1 + bigConstant * bufVarSignal >= 0, "buf_delay");
-
-  pathInVarsVector.push_back(t1);
-  pathOutVarsVector.push_back(t2);
-  bufVarsVector.push_back(bufVarSignal);
 }
 
 void MAPBUFBuffers::retrieveFPGA20Constraints(GRBModel &model) {
@@ -600,6 +596,7 @@ void MAPBUFBuffers::setup() {
   experimental::BlifParser parser;
   experimental::BlifData anchorsRemoved =
       parser.parseBlifFile(blifFile.str() + "noAnchors.blif");
+
   experimental::BlifData withAnchors =
       parser.parseBlifFile(blifFile.str() + "anchored.blif");
 
@@ -665,27 +662,27 @@ void MAPBUFBuffers::setup() {
 
   addCutSelectionConstraints();
 
-  for (auto *node : anchorsRemoved.getNodesInOrder()) {
-    auto *anchoredNode = withAnchors.getNodeByName(node->str());
-    if (anchoredNode) {
-      *anchoredNode = *node;
-    }
-  }
+  // for (auto *node : anchorsRemoved.getNodesInOrder()) {
+  //   auto *anchoredNode = withAnchors.getNodeByName(node->str());
+  //   if (anchoredNode) {
+  //     *anchoredNode = *node;
+  //   }
+  // }
 
-  for (auto &[key, val] : experimental::Cuts::cuts) {
-    for (auto &cut : val) {
-      for (auto *leaf : cut.leaves) {
-        auto *anchoredLeaf = withAnchors.getNodeByName(leaf->str());
-        if (anchoredLeaf) {
-          *anchoredLeaf = *leaf;
-        }
-      }
-      auto *anchoredRoot = withAnchors.getNodeByName(key->str());
-      if (anchoredRoot) {
-        *anchoredRoot = *key;
-      }
-    }
-  }
+  // for (auto &[key, val] : experimental::Cuts::cuts) {
+  //   for (auto &cut : val) {
+  //     for (auto *leaf : cut.leaves) {
+  //       auto *anchoredLeaf = withAnchors.getNodeByName(leaf->str());
+  //       if (anchoredLeaf) {
+  //         *anchoredLeaf = *leaf;
+  //       }
+  //     }
+  //     auto *anchoredRoot = withAnchors.getNodeByName(key->str());
+  //     if (anchoredRoot) {
+  //       *anchoredRoot = *key;
+  //     }
+  //   }
+  // }
 
   // for (auto &node : anchorsRemoved.getNodes()) {
   //   GRBVar &nodeVar = nodeToGRB[node];
@@ -709,21 +706,15 @@ void MAPBUFBuffers::setup() {
   // }
   // model.update();
 
-  // std::list<GrbConst> constraints;
-  // std::list<GrbConst> constraintsEqual;
   model.update();
   int n = experimental::Cuts::cuts.size();
   pathMap leafToRootPaths;
-  // #pragma omp parallel for schedule(guided)
   for (int i = 0; i < n; ++i) {
-    // Create local constraints for each thread
-    // std::list<GrbConst> localConstraints;
-    // std::list<GrbConst> localConstraintsEqual;
     // Loop over each subject graph edge
     auto it = std::next(experimental::Cuts::cuts.begin(), i);
     auto *key = it->first;
     auto &val = it->second;
-    
+
     llvm::errs() << "Adding constraints for node: " << key->str() << "\n";
 
     // Retrieve the Gurobi variable corresponding to the subject graph edge. If
@@ -741,7 +732,7 @@ void MAPBUFBuffers::setup() {
       llvm::errs() << "Adding single fanin delay constraint for fanin: "
                    << (*fanIns.begin())->str() << "\n";
       model.addConstr(nodeVar == faninVar, "single_fanin_delay");
-      // localConstraintsEqual.emplace_back(nodeVar, faninVar, 0);
+
       continue;
     }
 
@@ -760,10 +751,6 @@ void MAPBUFBuffers::setup() {
           model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
                               faninVar + lutDelay,
                           "trivial_cut_delay");
-          // localConstraints.emplace_back(nodeVar +
-          //                                   (1 - cutSelectionVar) *
-          //                                   bigConstant,
-          //                               faninVar + lutDelay, 1);
         }
         continue;
       }
@@ -783,19 +770,12 @@ void MAPBUFBuffers::setup() {
                             leafVar + lutDelay,
                         "delay_propagation");
 
-        // localConstraints.emplace_back(nodeVar +
-        //                                   (1 - cutSelectionVar) *
-        //                                   bigConstant,
-        //                               leafVar + lutDelay, 2);
-
         // Get the path from the leaf to the root
         std::vector<experimental::Node *> path;
 
-        // #pragma omp critical
-        {
-          path = getOrCreateLeafToRootPath(key, leaf, leafToRootPaths,
-                                           anchorsRemoved);
-        }
+        path = getOrCreateLeafToRootPath(key, leaf, leafToRootPaths,
+                                         anchorsRemoved);
+
         for (auto &nodePath : path) {
           // Loop over edges in the path from the leaf to the root. Add cut
           // selection conflict constraints for channels that are on the path.
@@ -806,37 +786,13 @@ void MAPBUFBuffers::setup() {
             model.addConstr(1 >= nodePath->gurobiVars->bufferVar.value() +
                                      cutSelectionVar,
                             "cut_selection_conflict");
-            // localConstraints.emplace_back(
-            //     1, nodePath->gurobiVars.bufferVar.value() + cutSelectionVar,
-            //     3);
           }
         }
       }
     }
-    // #pragma omp critical
-    //     {
-    //       // Gurobi does not allow to modify the model from multiple threads,
-    //       so we
-    //       // need to add the constraints in a critical section
-    //       constraints.splice(constraints.end(), localConstraints);
-    //       constraintsEqual.splice(constraintsEqual.end(),
-    //       localConstraintsEqual);
-    //     }
   }
 
   model.update();
-
-  // for (auto &constraint : constraints) {
-  //   model.addConstr(
-  //       constraint.lhs >= constraint.rhs,
-  //       static_cast<std::string>(getConstraintName(constraint.constraintType)));
-  // }
-
-  // for (auto &constraint : constraintsEqual) {
-  //   model.addConstr(
-  //       constraint.lhs == constraint.rhs,
-  //       static_cast<std::string>(getConstraintName(constraint.constraintType)));
-  // }
 
   SmallVector<CFDFC *> cfdfcs;
   for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
@@ -847,8 +803,9 @@ void MAPBUFBuffers::setup() {
     addChannelThroughputConstraints(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
   }
+
   addObjective(allChannels, cfdfcs);
-  model.set(GRB_IntParam_DualReductions, 0);
+  // model.set(GRB_IntParam_DualReductions, 0);
   llvm::errs() << "model marked ready to optimize"
                << "\n";
   markReadyToOptimize();

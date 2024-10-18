@@ -1,4 +1,4 @@
-//===-- CutEnumeration.cpp - Exp. support for MAPBUF buffer placement -----*-
+//===-- BlifReader.cpp - Exp. support for MAPBUF buffer placement -----*-
 // C++
 //-*-===//
 //
@@ -29,7 +29,7 @@ void Node::setName(const std::string &newName) {
   }
 }
 
-void BlifData::traverseUtil(Node* node, std::set<Node*> &visitedNodes){
+void BlifData::traverseUtil(Node *node, std::set<Node *> &visitedNodes) {
   if (std::find(nodesTopologicalOrder.begin(), nodesTopologicalOrder.end(),
                 node) != nodesTopologicalOrder.end()) {
     return;
@@ -37,7 +37,7 @@ void BlifData::traverseUtil(Node* node, std::set<Node*> &visitedNodes){
 
   visitedNodes.insert(node);
   // llvm::errs() << "Node: " << node << "\n";
-  for (const auto fanin : node->getFanins()) {
+  for (auto *const fanin : node->getFanins()) {
     if (std::find(nodesTopologicalOrder.begin(), nodesTopologicalOrder.end(),
                   fanin) == nodesTopologicalOrder.end() &&
         visitedNodes.count(fanin) > 0) {
@@ -54,40 +54,23 @@ void BlifData::traverseUtil(Node* node, std::set<Node*> &visitedNodes){
 }
 
 void BlifData::traverseNodes() {
-  std::set<Node*> primaryInputs;
-  std::set<Node*> primaryInputsCalculated;
-  std::set<Node*> primaryOutputs;
-  std::set<Node*> primaryOutputsCalculated;
+  std::set<Node *> primaryInputs;
+  std::set<Node *> primaryOutputs;
 
   for (auto &node : nodes) {
-    if (node.second->isInput() || node.second->isLatchOutput() || node.second->isConstZero() ||
-        node.second->isConstOne()) {
+    if (node.second->isPrimaryInput()) {
       primaryInputs.insert(node.second);
     }
-    if (node.second->isPrimaryInput()) {
-      primaryInputsCalculated.insert(node.second);
-    }
-    if (node.second->isOutput() || node.second->isLatchInput()) {
+    if (node.second->isPrimaryOutput()) {
       primaryOutputs.insert(node.second);
     }
-    if (node.second->isPrimaryOutput()) {
-      primaryOutputsCalculated.insert(node.second);
-    }
   }
 
-  if (primaryInputs.size() != primaryInputsCalculated.size()) {
-    llvm::errs() << "Mismatch between primary inputs sets!\n";
-  }
-
-  if (primaryOutputs.size() != primaryOutputsCalculated.size()) {
-    llvm::errs() << "Mismatch between primary outputs sets!\n";
-  }
-
-  for (auto* input : primaryInputs) {
+  for (auto *input : primaryInputs) {
     nodesTopologicalOrder.push_back(input);
   }
 
-  std::set<Node*> visitedNodes;
+  std::set<Node *> visitedNodes;
   for (const auto &node : primaryOutputs) {
     traverseUtil(node, visitedNodes);
   }
@@ -122,9 +105,8 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
       std::istringstream iss(inputs);
       std::string input;
       while (iss >> input) {
-        Node* inputNode = data.createNode(input);
+        Node *inputNode = data.createNode(input);
         inputNode->setInput(true);
-        inputNode->setPrimaryInput(true);
       }
     }
 
@@ -133,9 +115,8 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
       std::istringstream iss(outputs);
       std::string output;
       while (iss >> output) {
-        Node* outputNode = data.createNode(output);
+        Node *outputNode = data.createNode(output);
         outputNode->setOutput(true);
-        outputNode->setPrimaryOutput(true);
       }
     }
 
@@ -147,13 +128,11 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
       iss >> regInput;
       iss >> regOutput;
 
-      Node* regInputNode = data.createNode(regInput);
+      Node *regInputNode = data.createNode(regInput);
       regInputNode->setLatchInput(true);
-      regInputNode->setPrimaryOutput(true);
 
-      Node* regOutputNode = data.createNode(regOutput);
+      Node *regOutputNode = data.createNode(regOutput);
       regOutputNode->setLatchOutput(true);
-      regOutputNode->setPrimaryInput(true);
 
       data.addLatch(regInputNode, regOutputNode);
     }
@@ -179,32 +158,30 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
       }
 
       if (currNodes.size() == 1) {
-        Node* fanOut = data.createNode(currNodes[0]);
+        Node *fanOut = data.createNode(currNodes[0]);
         if (function == "0") {
           fanOut->setConstZero(true);
-          fanOut->setPrimaryInput(true);
         } else if (function == "1") {
           fanOut->setConstOne(true);
-          fanOut->setPrimaryInput(true);
         } else {
-          llvm::errs() << "Unknown c*onstant value: " << function << "\n";
+          llvm::errs() << "Unknown constant value: " << function << "\n";
         }
         fanOut->setFunction(function);
       } else if (currNodes.size() == 2) {
-        Node* fanout = data.createNode(currNodes.back());
-        Node* fanin = data.createNode(currNodes.front());
+        Node *fanout = data.createNode(currNodes.back());
+        Node *fanin = data.createNode(currNodes.front());
         fanout->addFanin(fanin);
         fanin->addFanout(fanout);
-        fanout->setFunction(function);
+        fanout->setFunction(line);
       } else if (currNodes.size() == 3) {
-        Node* fanout = data.createNode(currNodes.back());
-        Node* fanin1 = data.createNode(currNodes[0]);
-        Node* fanin2 = data.createNode(currNodes[1]);
+        Node *fanout = data.createNode(currNodes.back());
+        Node *fanin1 = data.createNode(currNodes[0]);
+        Node *fanin2 = data.createNode(currNodes[1]);
         fanout->addFanin(fanin1);
         fanout->addFanin(fanin2);
         fanin1->addFanout(fanout);
         fanin2->addFanout(fanout);
-        fanout->setFunction(function);
+        fanout->setFunction(line);
       } else {
         llvm::errs() << "Unknown number of nodes in .names: "
                      << currNodes.size() << "\n";
@@ -222,16 +199,68 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
 
   for (auto &node : data.getAllNodes()) {
     auto fanins = node->getFanins();
-    if (fanins.empty()) {
-      node->setPrimaryInput(true);
+    if (fanins.empty() && !node->isPrimaryInput()) { //
+      llvm::errs() << "Node " << node->str() << " no fanin!\n";
+      node->setInput(true);
     }
     auto fanouts = node->getFanouts();
-    if (fanouts.empty()) {
-      node->setPrimaryOutput(true);
+    if (fanouts.empty() && !node->isPrimaryOutput()) {
+      llvm::errs() << "Node " << node->str() << " no fanout!\n";
+      node->setOutput(true);
     }
   }
   data.traverseNodes();
   return data;
+}
+
+void BlifData::generateBlifFile(const std::string &filename) {
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    llvm::errs() << "Unable to open file: " << filename << "\n";
+    return;
+  }
+
+  file << ".model " << moduleName << "\n";
+
+  file << ".inputs";
+  for (const auto &input : getInputs()) {
+    file << " " << input->getName();
+  }
+  file << "\n";
+
+  file << ".outputs";
+  for (const auto &output : getOutputs()) {
+    file << " " << output->getName();
+  }
+  file << "\n";
+
+  for (const auto &latch : latches) {
+    file << ".latch " << latch.first->getName() << " "
+         << latch.second->getName() << "\n";
+  }
+
+  for (const auto &node : nodesTopologicalOrder) {
+    if (node->isConstZero() || node->isConstOne()) {
+      file << ".names " << node->getName() << "\n";
+      file << (node->isConstZero() ? "0" : "1") << "\n";
+    } else if (node->getFanins().size() == 1) {
+      file << ".names " << (*node->getFanins().begin())->getName() << " "
+           << node->getName() << "\n";
+      file << node->getFunction() << "\n";
+    } else if (node->getFanins().size() == 2) {
+      auto fanins = node->getFanins();
+      auto it = fanins.begin();
+      auto name1 = (*it)->getName();
+      ++it;
+      auto name2 = (*it)->getName();
+      file << ".names " << name1 << " " << name2 << " " << node->getName()
+           << "\n";
+      file << node->getFunction() << "\n";
+    }
+  }
+
+  file << ".end\n";
+  file.close();
 }
 
 // std::vector<std::string> BlifData::findPath(const std::string &start,
@@ -267,21 +296,21 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
 //   return path;
 // }
 
-std::vector<Node*> BlifData::findPath(Node* start, Node* end) {
-  std::queue<Node*> queue;
-  std::unordered_map<Node*, Node*, boost::hash<Node*>> parent;
-  std::set<Node*> visited;
+std::vector<Node *> BlifData::findPath(Node *start, Node *end) {
+  std::queue<Node *> queue;
+  std::unordered_map<Node *, Node *, boost::hash<Node *>> parent;
+  std::set<Node *> visited;
 
   queue.push(start);
   visited.insert(start);
 
   while (!queue.empty()) {
-    Node* current = queue.front();
+    Node *current = queue.front();
     queue.pop();
 
     if (current == end) {
       // Reconstruct the path
-      std::vector<Node*> path;
+      std::vector<Node *> path;
       while (current != start) {
         path.push_back(current);
         current = parent[current];
@@ -304,13 +333,13 @@ std::vector<Node*> BlifData::findPath(Node* start, Node* end) {
   return {};
 }
 
-std::set<Node*>
+std::set<Node *>
 BlifData::findNodesWithLimitedWavyInputs(size_t limit,
-                                         std::set<Node*> &wavyLine) {
-  std::set<Node*> nodesWithLimitedPrimaryInputs;
+                                         std::set<Node *> &wavyLine) {
+  std::set<Node *> nodesWithLimitedPrimaryInputs;
 
   for (auto &node : nodesTopologicalOrder) {
-    std::set<Node*> wavyInputs = findWavyInputsOfNode(node, wavyLine);
+    std::set<Node *> wavyInputs = findWavyInputsOfNode(node, wavyLine);
     if (wavyInputs.size() <= limit) {
       nodesWithLimitedPrimaryInputs.insert(node);
     }
@@ -318,11 +347,11 @@ BlifData::findNodesWithLimitedWavyInputs(size_t limit,
   return nodesWithLimitedPrimaryInputs;
 }
 
-std::set<Node*> BlifData::findWavyInputsOfNode(Node* node,
-                                              std::set<Node*> &wavyLine) {
-  std::set<Node*> primaryInputs;
-  std::set<Node*> visited;
-  std::function<void(Node*)> dfs = [&](Node* currentNode) {
+std::set<Node *> BlifData::findWavyInputsOfNode(Node *node,
+                                                std::set<Node *> &wavyLine) {
+  std::set<Node *> primaryInputs;
+  std::set<Node *> visited;
+  std::function<void(Node *)> dfs = [&](Node *currentNode) {
     if (visited.count(currentNode) > 0) {
       return;
     }

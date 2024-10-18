@@ -1,0 +1,6 @@
+source -s abc.rc
+read test_blif.txt 
+read_blif test_blif.txt 
+strash
+if -K 6
+exit

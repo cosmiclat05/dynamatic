@@ -1,4 +1,4 @@
-//===- CutEnumeration.h - Exp. support for MAPBUF buffer placement -------*- C++
+//===- BlifReader.h - Exp. support for MAPBUF buffer placement -------*- C++
 //-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
@@ -16,14 +16,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "gurobi_c++.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/Block.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Region.h"
-#include "mlir/Pass/Pass.h"
-
 #include <boost/functional/hash/extensions.hpp>
-#include <functional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -35,6 +28,7 @@ namespace dynamatic {
 namespace experimental {
 
 class BlifData;
+class Node;
 
 struct MILPVarsSubjectGraph {
   GRBVar tIn;
@@ -47,7 +41,6 @@ class Node {
 private:
   std::string name;
   BlifData *parent;
-  bool isPrimaryInputBool = false;
   bool isPrimaryOutputBool = false;
   bool isInputBool = false;
   bool isOutputBool = false;
@@ -75,8 +68,6 @@ public:
     // Copy the primitive types and strings
     name = other.name;
     parent = other.parent; // Shallow copy (depends on ownership)
-    isPrimaryInputBool = other.isPrimaryInputBool;
-    isPrimaryOutputBool = other.isPrimaryOutputBool;
     isInputBool = other.isInputBool;
     isOutputBool = other.isOutputBool;
     isLatchInputBool = other.isLatchInputBool;
@@ -109,8 +100,6 @@ public:
 
   const std::string &getName() const { return name; }
   void setName(const std::string &newName);
-  void setPrimaryInput(bool value) { isPrimaryInputBool = value; }
-  void setPrimaryOutput(bool value) { isPrimaryOutputBool = value; }
   void setInput(bool value) { isInputBool = value; }
   void setOutput(bool value) { isOutputBool = value; }
   void setLatchInput(bool value) { isLatchInputBool = value; }
@@ -121,8 +110,8 @@ public:
 
   bool isInput() const { return isInputBool; }
   bool isOutput() const { return isOutputBool; }
-  bool isPrimaryInput() const { return isPrimaryInputBool; }
-  bool isPrimaryOutput() const { return isPrimaryOutputBool; }
+  bool isPrimaryInput() const { return (isConstOneBool || isConstZeroBool || isInputBool || isLatchOutputBool) ; }
+  bool isPrimaryOutput() const { return (isOutputBool || isLatchInputBool); }
   bool isLatchInput() const { return isLatchInputBool; }
   bool isLatchOutput() const { return isLatchOutputBool; }
   bool isConstZero() const { return isConstZeroBool; }
@@ -163,7 +152,7 @@ private:
 public:
   BlifData() = default;
 
-  void addLatch(Node *input, Node *output) { latches[input] = output; }
+  void addLatch(Node *input, Node *output) { latches[input] = output;}
 
   Node *getNodeByName(const std::string &name) {
     auto it = nodes.find(name);
@@ -213,12 +202,34 @@ public:
 
   std::vector<Node *> getNodesInOrder() { return nodesTopologicalOrder; }
 
+  std::set<Node *> getInputs() {
+    std::set<Node *> result;
+    for (const auto &pair : nodes) {
+      if (pair.second->isInput()) {
+        result.insert(pair.second);
+      }
+    }
+    return result;
+  }
+
+  std::set<Node *> getOutputs() {
+    std::set<Node *> result;
+    for (const auto &pair : nodes) {
+      if (pair.second->isOutput()) {
+        result.insert(pair.second);
+      }
+    }
+    return result;
+  }
+
   void setModuleName(const std::string &moduleName) {
     this->moduleName = moduleName;
   }
+
   void traverseUtil(Node *node, std::set<Node *> &visitedNodes);
   void traverseNodes();
   void printModuleInfo();
+  void generateBlifFile(const std::string &filename);
 
   std::set<Node *> getAllNodes() {
     std::set<Node *> result;
@@ -245,4 +256,4 @@ public:
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // EXPERIMENTAL_SUPPORT_CUT_ENUMERATION_H
+#endif // EXPERIMENTAL_SUPPORT_BLIF_READER_H

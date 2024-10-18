@@ -555,19 +555,19 @@ auto getHandshakeTypeBitWidth = [](Type type) -> unsigned {
 
     if (algorithm == CUT_LOOPBACKS) {
       // Iterate over all operations in the function
-      // funcOp.walk([&](Operation *op) {
-      //   llvm::errs() << "Operation: " << getUniqueName(op) << "\n";
-      //   for (Value input : op->getOperands()) {
-      //     llvm::errs() << "Input: " << input << ", Bitwidth: " << getHandshakeTypeBitWidth(input.getType()) 
-      //                  << ", Number of Channels: " << op->getNumOperands()
-      //                  << "\n";
-      //   }
-      //   for (Value output : op->getResults()) {
-      //     llvm::errs() << "Output: " << output << "Bitwidth: " << getHandshakeTypeBitWidth(output.getType())
-      //                  << ", Number of Channels: " << op->getNumResults()
-      //                  << "\n";
-      //   }
-      // });
+      funcOp.walk([&](Operation *op) {
+        llvm::errs() << "Operation: " << getUniqueName(op) << "\n";
+        for (Value input : op->getOperands()) {
+          llvm::errs() << "Input: " << input << ", Bitwidth: " << getHandshakeTypeBitWidth(input.getType()) 
+                       << ", Number of Channels: " << op->getNumOperands()
+                       << "\n";
+        }
+        for (Value output : op->getResults()) {
+          llvm::errs() << "Output: " << output << "Bitwidth: " << getHandshakeTypeBitWidth(output.getType())
+                       << ", Number of Channels: " << op->getNumResults()
+                       << "\n";
+        }
+      });
 
       // Make sure that all the loops are cut by placing at least one buffer
       funcOp.walk([&](mlir::Operation *op) {

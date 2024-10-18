@@ -74,10 +74,7 @@ protected:
 
 private:
   StringRef blifFile;
-  std::vector<GRBVar> pathInVarsVector;
-  std::vector<GRBVar> pathOutVarsVector;
-  std::vector<GRBVar> bufVarsVector;
-  float lutDelay = 0.7;
+  float lutDelay = 0.5;
   int bigConstant = 100;
 
   /// Adds channel-specific buffering constraints that were parsed from IR
