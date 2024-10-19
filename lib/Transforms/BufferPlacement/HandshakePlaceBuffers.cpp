@@ -26,6 +26,7 @@
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
+#include "experimental/Support/SubjectGraph.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
@@ -556,12 +557,13 @@ auto getHandshakeTypeBitWidth = [](Type type) -> unsigned {
     if (algorithm == CUT_LOOPBACKS) {
       // Iterate over all operations in the function
       funcOp.walk([&](Operation *op) {
-        llvm::errs() << "Operation: " << getUniqueName(op) << "\n";
-        for (Value input : op->getOperands()) {
-          llvm::errs() << "Input: " << input << ", Bitwidth: " << getHandshakeTypeBitWidth(input.getType()) 
-                       << ", Number of Channels: " << op->getNumOperands()
-                       << "\n";
-        }
+        new experimental::Module(op);
+        // llvm::errs() << "Operation: " << getUniqueName(op) << "\n";
+        // for (Value input : op->getOperands()) {
+        //   llvm::errs() << "Input: " << input << ", Bitwidth: " << getHandshakeTypeBitWidth(input.getType()) 
+        //                << ", Number of Channels: " << op->getNumOperands()
+        //                << "\n";
+        // }
         for (Value output : op->getResults()) {
           llvm::errs() << "Output: " << output << "Bitwidth: " << getHandshakeTypeBitWidth(output.getType())
                        << ", Number of Channels: " << op->getNumResults()

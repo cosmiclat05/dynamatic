@@ -250,7 +250,7 @@ public:
 class BlifParser {
 public:
   BlifParser() = default;
-  experimental::BlifData parseBlifFile(const std::string &filename);
+  experimental::BlifData* parseBlifFile(const std::string &filename);
 };
 
 } // namespace experimental

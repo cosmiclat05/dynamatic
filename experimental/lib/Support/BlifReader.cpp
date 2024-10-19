@@ -76,8 +76,8 @@ void BlifData::traverseNodes() {
   }
 }
 
-BlifData BlifParser::parseBlifFile(const std::string &filename) {
-  BlifData data;
+BlifData* BlifParser::parseBlifFile(const std::string &filename) {
+  BlifData* data = new BlifData();
   std::ifstream file(filename);
   if (!file.is_open()) {
     llvm::errs() << "Unable to open file: " << filename << "\n";
@@ -97,7 +97,7 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
     }
 
     if (line.find(".model") == 0) {
-      data.setModuleName(line.substr(7));
+      data->setModuleName(line.substr(7));
     }
 
     else if (line.find(".inputs") == 0) {
@@ -105,7 +105,7 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
       std::istringstream iss(inputs);
       std::string input;
       while (iss >> input) {
-        Node *inputNode = data.createNode(input);
+        Node *inputNode = data->createNode(input);
         inputNode->setInput(true);
       }
     }
@@ -115,7 +115,7 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
       std::istringstream iss(outputs);
       std::string output;
       while (iss >> output) {
-        Node *outputNode = data.createNode(output);
+        Node *outputNode = data->createNode(output);
         outputNode->setOutput(true);
       }
     }
@@ -128,13 +128,13 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
       iss >> regInput;
       iss >> regOutput;
 
-      Node *regInputNode = data.createNode(regInput);
+      Node *regInputNode = data->createNode(regInput);
       regInputNode->setLatchInput(true);
 
-      Node *regOutputNode = data.createNode(regOutput);
+      Node *regOutputNode = data->createNode(regOutput);
       regOutputNode->setLatchOutput(true);
 
-      data.addLatch(regInputNode, regOutputNode);
+      data->addLatch(regInputNode, regOutputNode);
     }
 
     else if (line.find(".names") == 0) {
@@ -158,7 +158,7 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
       }
 
       if (currNodes.size() == 1) {
-        Node *fanOut = data.createNode(currNodes[0]);
+        Node *fanOut = data->createNode(currNodes[0]);
         if (function == "0") {
           fanOut->setConstZero(true);
         } else if (function == "1") {
@@ -168,15 +168,15 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
         }
         fanOut->setFunction(function);
       } else if (currNodes.size() == 2) {
-        Node *fanout = data.createNode(currNodes.back());
-        Node *fanin = data.createNode(currNodes.front());
+        Node *fanout = data->createNode(currNodes.back());
+        Node *fanin = data->createNode(currNodes.front());
         fanout->addFanin(fanin);
         fanin->addFanout(fanout);
         fanout->setFunction(line);
       } else if (currNodes.size() == 3) {
-        Node *fanout = data.createNode(currNodes.back());
-        Node *fanin1 = data.createNode(currNodes[0]);
-        Node *fanin2 = data.createNode(currNodes[1]);
+        Node *fanout = data->createNode(currNodes.back());
+        Node *fanin1 = data->createNode(currNodes[0]);
+        Node *fanin2 = data->createNode(currNodes[1]);
         fanout->addFanin(fanin1);
         fanout->addFanin(fanin2);
         fanin1->addFanout(fanout);
@@ -197,7 +197,7 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
     }
   }
 
-  for (auto &node : data.getAllNodes()) {
+  for (auto &node : data->getAllNodes()) {
     auto fanins = node->getFanins();
     if (fanins.empty() && !node->isPrimaryInput()) { //
       llvm::errs() << "Node " << node->str() << " no fanin!\n";
@@ -209,7 +209,7 @@ BlifData BlifParser::parseBlifFile(const std::string &filename) {
       node->setOutput(true);
     }
   }
-  data.traverseNodes();
+  data->traverseNodes();
   return data;
 }
 

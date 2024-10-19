@@ -28,6 +28,7 @@
 #include <omp.h>
 #include <string>
 #include <unordered_map>
+#include <fstream>
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -594,17 +595,17 @@ void MAPBUFBuffers::setup() {
   signals.push_back(SignalType::READY);
 
   experimental::BlifParser parser;
-  experimental::BlifData anchorsRemoved =
+  experimental::BlifData* anchorsRemoved =
       parser.parseBlifFile(blifFile.str() + "noAnchors.blif");
 
-  experimental::BlifData withAnchors =
+  experimental::BlifData* withAnchors =
       parser.parseBlifFile(blifFile.str() + "anchored.blif");
 
   // Run cut enumeration on the both versions of the subject graph, with anchors
   // and without anchors. Cut enumeration with anchors give us the cuts such
   // that every node is enumerated until the channels. Cut enumeration without
   // anchors give us the deepest cuts.
-  experimental::Cuts cutsAnchorsRemoved(anchorsRemoved, 6, 0);
+  experimental::Cuts cutsAnchorsRemoved(*anchorsRemoved, 6, 0);
   cutsAnchorsRemoved.runCutAlgos(false, true, false, false);
 
   // experimental::Cuts cutsWithAnchors(withAnchors, 6, 0);
@@ -654,7 +655,7 @@ void MAPBUFBuffers::setup() {
 
   // retrieveFPGA20Constraints(model);
 
-  addClockPeriodConstraintsNodes(anchorsRemoved);
+  addClockPeriodConstraintsNodes(*anchorsRemoved);
 
   addBlackboxConstraints();
 
@@ -774,7 +775,7 @@ void MAPBUFBuffers::setup() {
         std::vector<experimental::Node *> path;
 
         path = getOrCreateLeafToRootPath(key, leaf, leafToRootPaths,
-                                         anchorsRemoved);
+                                         *anchorsRemoved);
 
         for (auto &nodePath : path) {
           // Loop over edges in the path from the leaf to the root. Add cut
