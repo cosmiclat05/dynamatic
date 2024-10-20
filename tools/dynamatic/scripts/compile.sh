@@ -182,7 +182,14 @@ else
   #   > "$F_HANDSHAKE_CUTLOOPBACKS"
   # exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
 
-  "$PYTHON_SCRIPT_MAPBUF" "$KERNEL_NAME" "$OUTPUT_DIR"
+  echo_info "Running simple buffer placement (on-merges)."
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --handshake-set-buffering-properties="version=fpga20" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=cut-loopbacks timing-models=$DYNAMATIC_DIR/data/components.json" \
+    > "$F_HANDSHAKE_CUTLOOPBACKS"
+  exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
+
+  # "$PYTHON_SCRIPT_MAPBUF" "$KERNEL_NAME" "$OUTPUT_DIR"
 
   # Smart buffer placement
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"

@@ -40,8 +40,8 @@ struct MILPVarsSubjectGraph {
 class Node {
 private:
   std::string name;
-  BlifData *parent;
-  bool isPrimaryOutputBool = false;
+  //BlifData *parent;
+  bool isChannelEdge = false;
   bool isInputBool = false;
   bool isOutputBool = false;
   bool isLatchInputBool = false;
@@ -49,15 +49,15 @@ private:
   bool isConstZeroBool = false;
   bool isConstOneBool = false;
   std::string function;
-  std::set<Node *> fanins;
-  std::set<Node *> fanouts;
+  std::set<Node *> fanins = {};
+  std::set<Node *> fanouts = {};
 
 public:
   MILPVarsSubjectGraph* gurobiVars;
   
   Node() = default;
   Node(const std::string &name, BlifData *parent)
-      : name(name), parent(parent), gurobiVars(new MILPVarsSubjectGraph()) {}
+      : name(name), gurobiVars(new MILPVarsSubjectGraph()) {}
 
   Node &operator=(const Node &other) {
     if (this == &other) {
@@ -67,7 +67,7 @@ public:
 
     // Copy the primitive types and strings
     name = other.name;
-    parent = other.parent; // Shallow copy (depends on ownership)
+    isChannelEdge = other.isChannelEdge;
     isInputBool = other.isInputBool;
     isOutputBool = other.isOutputBool;
     isLatchInputBool = other.isLatchInputBool;
@@ -100,6 +100,7 @@ public:
 
   const std::string &getName() const { return name; }
   void setName(const std::string &newName);
+  void setChannelEdge(bool value) { isChannelEdge = value; }
   void setInput(bool value) { isInputBool = value; }
   void setOutput(bool value) { isOutputBool = value; }
   void setLatchInput(bool value) { isLatchInputBool = value; }
@@ -110,6 +111,7 @@ public:
 
   bool isInput() const { return isInputBool; }
   bool isOutput() const { return isOutputBool; }
+  bool isChannelEdgeNode() const { return isChannelEdge; }
   bool isPrimaryInput() const { return (isConstOneBool || isConstZeroBool || isInputBool || isLatchOutputBool) ; }
   bool isPrimaryOutput() const { return (isOutputBool || isLatchInputBool); }
   bool isLatchInput() const { return isLatchInputBool; }
@@ -118,11 +120,13 @@ public:
   bool isConstOne() const { return isConstOneBool; }
   const std::string &getFunction() const { return function; }
 
-  std::set<Node *> getFanins() const { return fanins; }
-  std::set<Node *> getFanouts() { return fanouts; }
+  std::set<Node *>& getFanins() { return fanins; }
+  std::set<Node *>& getFanouts() { return fanouts; }
 
   void addFanin(Node *node) { fanins.insert(node); }
-  void addFanout(Node *&node) { fanouts.insert(node); }
+  void addFanout(Node *node) { fanouts.insert(node); }
+  void addFanin(std::set<Node *>& nodes) { fanins.insert(nodes.begin(), nodes.end()); }
+  void addFanout(std::set<Node *>& nodes) { fanouts.insert(nodes.begin(), nodes.end()); }
 
   bool operator==(const Node &other) const { return name == other.name; }
   bool operator==(const Node *other) const { return name == other->name; }
@@ -178,6 +182,27 @@ public:
       node->name = newName;
       nodes[newName] = node;
     }
+  }
+
+  bool isChannelRSTVar(Node* node) {
+  // a hacky way to determine if a variable is a channel variable.
+  // if it includes "new", "." and does not include "_", it is not a channel
+  // variable
+  return ((node->getName().find("new") == std::string::npos &&
+         node->getName().find('.') == std::string::npos &&
+         node->getName().find('_') != std::string::npos) || node->getName().find("rst") != std::string::npos);
+  }
+
+  Node* addNode(Node* node) {
+    static unsigned int counter = 0;
+    if (nodes.find(node->getName()) != nodes.end()) {
+      if (isChannelRSTVar(node)){
+        return nodes[node->getName()];
+      }
+      node->setName(node->getName() + "_" + std::to_string(counter++));
+    }
+    nodes[node->getName()] = node;
+    return node;
   }
 
   std::set<Node *> getPrimaryInputs() {
@@ -237,6 +262,10 @@ public:
       result.insert(pair.second);
     }
     return result;
+  }
+
+  std::unordered_map<Node *, Node *, boost::hash<Node *>> getLatches() const {
+    return latches;
   }
 
   std::vector<Node *> findPath(Node *start, Node *end);

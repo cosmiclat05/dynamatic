@@ -18,17 +18,18 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutEnumeration.h"
+#include "experimental/Support/SubjectGraph.h"
 #include "gurobi_c.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include <boost/functional/hash/extensions.hpp>
+#include <fstream>
 #include <list>
 #include <omp.h>
 #include <string>
 #include <unordered_map>
-#include <fstream>
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -387,11 +388,11 @@ void MAPBUFBuffers::addBlackboxConstraints() {
         GRBVar &adderInReady =
             inputChannelVars.signalVars[SignalType::READY].path.tIn;
 
-        model.addConstr(adderOutReady + 0.1 == adderInReady,
-                        "adderConstraint_ready");
+        // model.addConstr(adderOutReady + 0.1 == adderInReady,
+        //                 "adderConstraint_ready");
 
-        model.addConstr(adderInValid + 0.1 == adderOutValid,
-                        "adderConstraint_valid");
+        // model.addConstr(adderInValid + 0.1 == adderOutValid,
+        //                 "adderConstraint_valid");
 
         GRBVar &adderOutPathIn =
             outputChannelVars.signalVars[SignalType::DATA].path.tIn;
@@ -544,14 +545,14 @@ void MAPBUFBuffers::retrieveFPGA20Constraints(GRBModel &model) {
       // Retrieve the Gurobi variable corresponding to varName
       auto varOpt = variableExists(model, varName);
       if (!varOpt) {
-        llvm::errs() << "Variable " << varName << " not found in the model."
-                     << "\n";
+        // llvm::errs() << "Variable " << varName << " not found in the model."
+        //              << "\n";
         continue;
       }
       GRBVar var = varOpt.value();
       // Add the equality constraint
-      llvm::errs() << "Adding constraint: " << varName << " == " << value
-                   << "\n";
+      // llvm::errs() << "Adding constraint: " << varName << " == " << value
+      //              << "\n";
       model.addConstr(var == value, "fpga20_results");
     }
   }
@@ -588,6 +589,8 @@ getOrCreateLeafToRootPath(experimental::Node *key, experimental::Node *leaf,
 }
 
 void MAPBUFBuffers::setup() {
+
+
   // Signals for which we have variables
   SmallVector<SignalType, 4> signals;
   signals.push_back(SignalType::DATA);
@@ -595,11 +598,13 @@ void MAPBUFBuffers::setup() {
   signals.push_back(SignalType::READY);
 
   experimental::BlifParser parser;
-  experimental::BlifData* anchorsRemoved =
-      parser.parseBlifFile(blifFile.str() + "noAnchors.blif");
+  // experimental::BlifData *anchorsRemoved =
+  //     parser.parseBlifFile(blifFile.str() + "noAnchors.blif");
+    experimental::BlifData *anchorsRemoved =
+      parser.parseBlifFile("/home/oyasar/full_integration/dynamatic_generated_after/merged.blif");
 
-  experimental::BlifData* withAnchors =
-      parser.parseBlifFile(blifFile.str() + "anchored.blif");
+  // experimental::BlifData *withAnchors =
+  //     parser.parseBlifFile(blifFile.str() + "anchored.blif");
 
   // Run cut enumeration on the both versions of the subject graph, with anchors
   // and without anchors. Cut enumeration with anchors give us the cuts such
@@ -716,7 +721,7 @@ void MAPBUFBuffers::setup() {
     auto *key = it->first;
     auto &val = it->second;
 
-    llvm::errs() << "Adding constraints for node: " << key->str() << "\n";
+    // llvm::errs() << "Adding constraints for node: " << key->str() << "\n";
 
     // Retrieve the Gurobi variable corresponding to the subject graph edge. If
     // the edge corresponds to a dataflow channel, then we need to retrieve the
@@ -730,8 +735,8 @@ void MAPBUFBuffers::setup() {
       // No cut should be selected for these nodes, the other cuts are present
       // for the correct cut enumeration.
       GRBVar &faninVar = (*fanIns.begin())->gurobiVars->tOut;
-      llvm::errs() << "Adding single fanin delay constraint for fanin: "
-                   << (*fanIns.begin())->str() << "\n";
+      // llvm::errs() << "Adding single fanin delay constraint for fanin: "
+      //              << (*fanIns.begin())->str() << "\n";
       model.addConstr(nodeVar == faninVar, "single_fanin_delay");
 
       continue;
@@ -746,8 +751,8 @@ void MAPBUFBuffers::setup() {
         // node.
         for (auto &fanIn : fanIns) {
           GRBVar &faninVar = fanIn->gurobiVars->tOut;
-          llvm::errs() << "Adding trivial cut delay constraint for fanin: "
-                       << fanIn->str() << "\n";
+          // llvm::errs() << "Adding trivial cut delay constraint for fanin: "
+          //              << fanIn->str() << "\n";
 
           model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
                               faninVar + lutDelay,
@@ -764,8 +769,8 @@ void MAPBUFBuffers::setup() {
         // channel.
         GRBVar &leafVar = leaf->gurobiVars->tOut;
 
-        llvm::errs() << "Adding delay propagation constraint for fanin: "
-                     << leaf->str() << " and leaf: " << leaf->str() << "\n";
+        // llvm::errs() << "Adding delay propagation constraint for fanin: "
+        //              << leaf->str() << " and leaf: " << leaf->str() << "\n";
         // Add the delay propagation constraint
         model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
                             leafVar + lutDelay,
@@ -781,9 +786,9 @@ void MAPBUFBuffers::setup() {
           // Loop over edges in the path from the leaf to the root. Add cut
           // selection conflict constraints for channels that are on the path.
           if (nodePath->gurobiVars->bufferVar.has_value()) {
-            llvm::errs()
-                << "Adding cut selection conflict constraint for node: "
-                << key->str() << " and leaf: " << leaf->str() << "\n";
+            // llvm::errs()
+                // << "Adding cut selection conflict constraint for node: "
+                // << key->str() << " and leaf: " << leaf->str() << "\n";
             model.addConstr(1 >= nodePath->gurobiVars->bufferVar.value() +
                                      cutSelectionVar,
                             "cut_selection_conflict");

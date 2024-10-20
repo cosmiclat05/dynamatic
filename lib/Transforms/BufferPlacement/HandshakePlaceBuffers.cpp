@@ -25,6 +25,7 @@
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include "experimental/Support/BlifReader.h"
 #include "experimental/Support/StdProfiler.h"
 #include "experimental/Support/SubjectGraph.h"
 #include "mlir/IR/OperationSupport.h"
@@ -35,7 +36,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
-
 
 using namespace mlir;
 using namespace dynamatic;
@@ -493,7 +493,6 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-#include "llvm/ADT/TypeSwitch.h"
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   // Read the operations' timing models from disk
   TimingDatabase timingDB(&getContext());
@@ -540,41 +539,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       }
     }
 
-auto getHandshakeTypeBitWidth = [](Type type) -> unsigned {
-  return llvm::TypeSwitch<Type, unsigned>(type)
-      .Case<handshake::ControlType>([](auto) { return 0; })
-      .Case<handshake::ChannelType>(
-          [](ChannelType channelType) { return channelType.getDataBitWidth(); })
-      .Case<IntegerType, FloatType>(
-          [](Type type) { return type.getIntOrFloatBitWidth(); })
-      .Default([](Type type) {
-        llvm::errs() << "unsupported type";
-        return 0;
-      });
-};
-
-
     if (algorithm == CUT_LOOPBACKS) {
-      funcOp.walk([&](handshake::ForkOp forkOp) {
-        experimental::ForkSubjectGraph forkSG(forkOp);
-      });
-
-      // Iterate over all operations in the function
-      // funcOp.walk([&](Operation *op) {
-      //   new experimental::Module(op);
-      //   // llvm::errs() << "Operation: " << getUniqueName(op) << "\n";
-      //   // for (Value input : op->getOperands()) {
-      //   //   llvm::errs() << "Input: " << input << ", Bitwidth: " << getHandshakeTypeBitWidth(input.getType()) 
-      //   //                << ", Number of Channels: " << op->getNumOperands()
-      //   //                << "\n";
-      //   // }
-      //   for (Value output : op->getResults()) {
-      //     llvm::errs() << "Output: " << output << "Bitwidth: " << getHandshakeTypeBitWidth(output.getType())
-      //                  << ", Number of Channels: " << op->getNumResults()
-      //                  << "\n";
-      //   }
-      // });
-
       // Make sure that all the loops are cut by placing at least one buffer
       funcOp.walk([&](mlir::Operation *op) {
         for (Value result : op->getResults()) {
@@ -617,8 +582,36 @@ auto getHandshakeTypeBitWidth = [](Type type) -> unsigned {
       placement[channel] = result;
     }
     instantiateBuffers(placement);
-  }
 
+    funcOp.walk(
+        [&](Operation *op) { (experimental::OperationDifferentiator(op)); });
+
+    for (auto &module : experimental::OperationDifferentiator::moduleMap) {
+      std::string uniqueName = getUniqueName(module.first).str();
+      llvm::errs() << "Unique Name: " << uniqueName << "\n";
+      module.second->connectInputNodes();
+      module.second->getBlifData()->generateBlifFile(
+          "/home/oyasar/full_integration/dynamatic_generated_after/" +
+          uniqueName + ".blif");
+    }
+
+    experimental::BlifData mergedBlif;
+    for (auto &module : experimental::OperationDifferentiator::moduleMap) {
+      std::string uniqueName = getUniqueName(module.first).str();
+      llvm::errs() << "Unique Name: " << uniqueName << "\n";
+      experimental::BlifData *blifModule = module.second->getBlifData();
+      for (auto &latch : blifModule->getLatches()) {
+        mergedBlif.addLatch(latch.first, latch.second);
+      }
+      for (auto &node : blifModule->getAllNodes()) {
+        mergedBlif.addNode(node);
+      }
+    }
+    mergedBlif.traverseNodes();
+    mergedBlif.setModuleName("merged");
+    mergedBlif.generateBlifFile(
+        "/home/oyasar/full_integration/dynamatic_generated_after/merged.blif");
+  }
   return success();
 }
 

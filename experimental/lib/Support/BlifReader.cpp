@@ -24,9 +24,12 @@
 using namespace dynamatic::experimental;
 
 void Node::setName(const std::string &newName) {
-  if (parent) {
-    parent->renameNode(name, newName);
-  }
+  // If we do it like this, then the parent blif will not see the change
+
+  // if (parent) {
+  //   parent->renameNode(name, newName);
+  // }
+  this->name = newName;
 }
 
 void BlifData::traverseUtil(Node *node, std::set<Node *> &visitedNodes) {
@@ -197,18 +200,19 @@ BlifData* BlifParser::parseBlifFile(const std::string &filename) {
     }
   }
 
-  for (auto &node : data->getAllNodes()) {
-    auto fanins = node->getFanins();
-    if (fanins.empty() && !node->isPrimaryInput()) { //
-      llvm::errs() << "Node " << node->str() << " no fanin!\n";
-      node->setInput(true);
-    }
-    auto fanouts = node->getFanouts();
-    if (fanouts.empty() && !node->isPrimaryOutput()) {
-      llvm::errs() << "Node " << node->str() << " no fanout!\n";
-      node->setOutput(true);
-    }
-  }
+  // for (auto &node : data->getAllNodes()) {
+  //   auto fanins = node->getFanins();
+  //   if (fanins.empty() && !node->isPrimaryInput()) { //
+  //     llvm::errs() << "Node " << node->str() << " no fanin!\n";
+  //     node->setInput(true);
+  //   }
+  //   auto fanouts = node->getFanouts();
+  //   if (fanouts.empty() && !node->isPrimaryOutput()) {
+  //     llvm::errs() << "Node " << node->str() << " no fanout!\n";
+  //     node->setOutput(true);
+  //   }
+  // }
+  
   data->traverseNodes();
   return data;
 }
