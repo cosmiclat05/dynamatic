@@ -6,56 +6,42 @@
 set-dynamatic-path  .
 
 set-src           integration-test/fir/fir.c
-compile --buffer-algorithm fpga20
-write-hdl --hdl verilog
 compile --buffer-algorithm mapbuf
 write-hdl
 simulate
 synthesize
 
 set-src           integration-test/gaussian/gaussian.c
-compile --buffer-algorithm fpga20
-write-hdl --hdl verilog
 compile --buffer-algorithm mapbuf
 write-hdl
 simulate
 synthesize
 
 set-src           integration-test/matrix/matrix.c
-compile --buffer-algorithm fpga20
-write-hdl --hdl verilog
 compile --buffer-algorithm mapbuf
 write-hdl
 simulate
 synthesize
 
 set-src           integration-test/stencil_2d/stencil_2d.c
-compile --buffer-algorithm fpga20
-write-hdl --hdl verilog
 compile --buffer-algorithm mapbuf
 write-hdl
 simulate
 synthesize
 
 set-src           integration-test/cnn/cnn.c
-compile --buffer-algorithm fpga20
-write-hdl --hdl verilog
 compile --buffer-algorithm mapbuf
 write-hdl
 simulate
 synthesize
 
 set-src           integration-test/while_loop_1/while_loop_1.c
-compile --buffer-algorithm fpga20
-write-hdl --hdl verilog
 compile --buffer-algorithm mapbuf
 write-hdl
 simulate
 synthesize
 
 set-src           integration-test/insertion_sort/insertion_sort.c
-compile --buffer-algorithm fpga20
-write-hdl --hdl verilog
 compile --buffer-algorithm mapbuf
 write-hdl
 simulate

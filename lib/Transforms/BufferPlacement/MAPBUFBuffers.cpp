@@ -11,6 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
@@ -23,6 +27,10 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
+
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/Support/IndentedOstream.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/raw_ostream.h"
 #include <boost/functional/hash/extensions.hpp>
 #include <fstream>
@@ -203,69 +211,6 @@ std::optional<GRBVar> variableExists(GRBModel &model,
   return {}; // Variable does not exist
 }
 
-enum ConstraintNames {
-  single_fanin_delay,     // 0
-  trivial_cut_delay,      // 1
-  delay_propagation,      // 2
-  cut_selection_conflict, // 3
-};
-
-constexpr std::string_view getConstraintName(ConstraintNames constraint) {
-  switch (constraint) {
-  case single_fanin_delay:
-    return "single_fanin_delay";
-  case trivial_cut_delay:
-    return "trivial_cut_delay";
-  case delay_propagation:
-    return "delay_propagation";
-  case cut_selection_conflict:
-    return "cut_selection_conflict";
-  }
-}
-
-struct GrbConst {
-  GRBLinExpr lhs;
-  GRBLinExpr rhs;
-  ConstraintNames constraintType;
-  GrbConst(const GRBLinExpr &lhs, const GRBLinExpr &rhs, int type)
-      : lhs(lhs), rhs(rhs), constraintType(static_cast<ConstraintNames>(type)) {
-  }
-};
-
-class VariableSearcher {
-private:
-  std::unordered_map<std::string, std::vector<GRBVar>> variableMap;
-
-public:
-  VariableSearcher(const std::vector<GRBVar> &channelVarsVec) {
-    for (const auto &var : channelVarsVec) {
-      std::string varName = var.get(GRB_StringAttr_VarName);
-      variableMap[varName].push_back(var);
-    }
-  }
-
-  GRBVar variableIncludes(const std::string &subStr,
-                          std::unordered_map<std::string, GRBVar> &nodeToGrb,
-                          const std::string &key) {
-
-    for (auto &pair : variableMap) {
-      if (pair.first.find(subStr) != std::string::npos) {
-        return pair.second.front();
-      }
-    }
-    return nodeToGrb[key];
-  }
-
-  std::optional<GRBVar> variableIncludes(const std::string &subStr) const {
-    for (const auto &pair : variableMap) {
-      if (pair.first.find(subStr) != std::string::npos) {
-        return pair.second.front();
-      }
-    }
-    return {};
-  }
-};
-
 bool isChannelVar(const std::string &node) {
   // a hacky way to determine if a variable is a channel variable.
   // if it includes "new", "." and does not include "_", it is not a channel
@@ -301,152 +246,87 @@ std::ostringstream retrieveChannelName(const std::string &node,
   const auto leafNodeNameTillUnderScore = node.substr(0, leafLastUnderscore);
   const auto channelTypeName = node.substr(leafLastUnderscore + 1);
 
-  std::ostringstream bufferVarNameStream;
+  std::ostringstream varNameStream;
   if (result.back() == "valid" || result.back() == "ready") {
-    bufferVarNameStream << (result.back() == "valid"
-                                ? ("valid" + variableTypeName)
-                                : ("ready" + variableTypeName))
-                        << leafNodeNameTillUnderScore;
+    varNameStream << (result.back() == "valid" ? ("valid" + variableTypeName)
+                                               : ("ready" + variableTypeName))
+                  << leafNodeNameTillUnderScore;
   } else {
     const auto leafLastPar = node.find_last_of('[');
     const auto leafNodeNameTillPar = node.substr(0, leafLastPar);
-    bufferVarNameStream << ("data" + variableTypeName) << leafNodeNameTillPar;
+    varNameStream << ("data" + variableTypeName) << leafNodeNameTillPar;
   }
-  return bufferVarNameStream;
+  return varNameStream;
 }
 
-void MAPBUFBuffers::addCutLoopbackBuffers() {
-  // Add constraints to ensure that the loopback buffers are placed. Simply loop
-  // over all the channels and check if the channel is a back edge.
-  auto funcOp = funcInfo.funcOp;
-  funcOp.walk([&](mlir::Operation *op) {
-    for (Value result : op->getResults()) {
-      for (Operation *user : result.getUsers()) {
-        if (isBackedge(result, user)) {
-          handshake::ChannelBufProps &resProps = channelProps[op->getResult(0)];
-          if (resProps.maxTrans.value_or(1) >= 1) {
-            GRBVar &bufVar = vars.channelVars[op->getResult(0)]
-                                 .signalVars[SignalType::READY]
-                                 .bufPresent;
-            model.addConstr(bufVar == 1, "backedge_ready");
-          }
-          if (resProps.maxOpaque.value_or(1) >= 1) {
-            GRBVar &bufVar = vars.channelVars[op->getResult(0)]
-                                 .signalVars[SignalType::DATA]
-                                 .bufPresent;
-            model.addConstr(bufVar == 1, "backedge_data");
-          }
-        }
-      }
-    }
-  });
+const std::map<unsigned int, double> ADDER_DELAYS = {
+    {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.6}, {16, 0.7}, {32, 1.0}};
+
+const std::map<unsigned int, double> COMPARATOR_DELAYS = {
+    {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.8}, {16, 1.0}, {32, 1.2}};
+
+double getDelay(const std::map<unsigned int, double> &delayTable,
+                unsigned int bitwidth) {
+  auto it = delayTable.lower_bound(bitwidth);
+  if (it == delayTable.end() || it->first != bitwidth) {
+    it = delayTable.upper_bound(bitwidth);
+  }
+  return it != delayTable.end() ? it->second : 0.0;
+}
+
+bool isOperationType(Operation *op, std::string_view type) {
+  return getUniqueName(op).find(type) != std::string::npos;
 }
 
 void MAPBUFBuffers::addBlackboxConstraints() {
   // Add constraints for blackbox operations, addi, subi, cmpi and
   // mem_controller. These delays are retrieved from Vivado Timing Reports.
+  // Ready and Valid signals are not blackboxed.
   for (auto &[channel, _] : channelProps) {
     Operation *definingOp = channel.getDefiningOp();
     if (!definingOp) {
       continue;
     }
 
-    auto numOps = definingOp->getNumOperands();
-    for (unsigned int i = 0; i < numOps; i++) {
-      auto isSubi = getUniqueName(definingOp).find("subi") != std::string::npos;
-      auto isAddi = getUniqueName(definingOp).find("addi") != std::string::npos;
-      auto isCmpi = getUniqueName(definingOp).find("cmpi") != std::string::npos;
-      auto isMem =
-          getUniqueName(definingOp).find("mem_controller") != std::string::npos;
+    for (unsigned int i = 0; i < definingOp->getNumOperands(); i++) {
+      bool isSubi = isOperationType(definingOp, "subi");
+      bool isAddi = isOperationType(definingOp, "addi");
+      bool isCmpi = isOperationType(definingOp, "cmpi");
+      bool isMem = isOperationType(definingOp, "mem_controller");
 
-      if (isSubi || isAddi || isCmpi || isMem) {
-        Value inputChannel = definingOp->getOperand(i);
-        ChannelVars &inputChannelVars = vars.channelVars[inputChannel];
-        ChannelVars &outputChannelVars = vars.channelVars[channel];
-        unsigned int bitwidth = 0;
+      if (!(isSubi || isAddi || isCmpi || isMem)) {
+        continue;
+      }
 
-        if (isMem)
-          continue;
+      Value inputChannel = definingOp->getOperand(i);
 
-        if (!isMem) {
-          bitwidth =
-              handshake::getHandshakeTypeBitWidth(inputChannel.getType());
+      if (isMem) {
+        continue;
+      }
 
-          if (bitwidth <= 4) {
-            break;
-          }
-        }
-        GRBVar &adderOutValid =
-            outputChannelVars.signalVars[SignalType::VALID].path.tIn;
+      // Get bitwidth and skip small operations
+      unsigned int bitwidth =
+          handshake::getHandshakeTypeBitWidth(inputChannel.getType());
+      if (bitwidth <= 4) {
+        break;
+      }
 
-        GRBVar &adderInValid =
-            inputChannelVars.signalVars[SignalType::VALID].path.tOut;
+      ChannelVars &inputChannelVars = vars.channelVars[inputChannel];
+      ChannelVars &outputChannelVars = vars.channelVars[channel];
 
-        GRBVar &adderOutReady =
-            outputChannelVars.signalVars[SignalType::READY].path.tOut;
+      GRBVar &outputPathIn =
+          outputChannelVars.signalVars[SignalType::DATA].path.tIn;
+      GRBVar &inputPathOut =
+          inputChannelVars.signalVars[SignalType::DATA].path.tOut;
 
-        GRBVar &adderInReady =
-            inputChannelVars.signalVars[SignalType::READY].path.tIn;
-
-        // model.addConstr(adderOutReady + 0.1 == adderInReady,
-        //                 "adderConstraint_ready");
-
-        // model.addConstr(adderInValid + 0.1 == adderOutValid,
-        //                 "adderConstraint_valid");
-
-        GRBVar &adderOutPathIn =
-            outputChannelVars.signalVars[SignalType::DATA].path.tIn;
-
-        GRBVar &adderInData =
-            inputChannelVars.signalVars[SignalType::DATA].path.tOut;
-
-        // std::map<unsigned int, double> adderDelay = {{1, 0.587},  {2, 0.587},
-        //                                              {4, 0.993},  {8, 0.991},
-        //                                              {16, 1.099},
-        //                                              {32, 1.315}};
-
-        std::map<unsigned int, double> adderDelay = {
-            {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.6}, {16, 0.7}, {32, 1.0}};
-
-        std::map<unsigned int, double> compDelay = {
-            {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.8}, {16, 1.0}, {32, 1.2}};
-
-        double delay = 0.0;
-
-        if (getUniqueName(definingOp).find("cmpi") != std::string::npos) {
-          // Find the smallest key in compDelay that is greater than or equal to
-          // bitwidth
-          auto it = compDelay.lower_bound(bitwidth);
-          if (it == compDelay.end() || it->first != bitwidth) {
-            // If bitwidth is not exactly a key, use the next higher key
-            it = compDelay.upper_bound(bitwidth);
-          }
-          if (it != compDelay.end()) {
-            delay = it->second;
-          }
-          model.addConstr(adderInData + delay == adderOutPathIn,
-                          "cmpiConstraint_" + std::to_string(bitwidth));
-
-          continue;
-        }
-
-        // Find the smallest key in adderDelay that is greater than or equal
-        // to bitwidth
-        auto it = adderDelay.lower_bound(bitwidth);
-        if (it == adderDelay.end() || it->first != bitwidth) {
-          // If bitwidth is not exactly a key, use the next higher key
-          it = adderDelay.upper_bound(bitwidth);
-        }
-        if (it != adderDelay.end()) {
-          delay = it->second;
-        }
-
-        // if (isMem) {
-        //   delay = 0.75;
-        // }
-
-        model.addConstr(adderInData + delay == adderOutPathIn,
-                        "adderConstraint_" + std::to_string(bitwidth));
+      if (isCmpi) {
+        double delay = getDelay(COMPARATOR_DELAYS, bitwidth);
+        model.addConstr(inputPathOut + delay == outputPathIn,
+                        "cmpi_constraint_" + std::to_string(bitwidth));
+      } else { // addi or subi
+        double delay = getDelay(ADDER_DELAYS, bitwidth);
+        model.addConstr(inputPathOut + delay == outputPathIn,
+                        "adder_constraint_" + std::to_string(bitwidth));
       }
     }
   }
@@ -473,8 +353,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes(
     GRBVar &nodeVarOut = vars->tOut;
     std::optional<GRBVar> &nodeBufVar = vars->bufferVar;
 
-    auto isChannel = isChannelVar(node->str());
-    if (isChannel) {
+    if (node->isChannelEdgeNode()) {
       std::optional<GRBVar> pathInVar =
           retrieveAndSearchGRBVar(node->str(), "pathIn");
       std::optional<GRBVar> pathOutVar =
@@ -487,25 +366,10 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes(
         nodeVarIn = pathInVar.value();
         nodeVarOut = pathOutVar.value();
         nodeBufVar = bufferVar;
-        // model.addConstr(nodeVarIn <= targetPeriod, "pathIn_period");
-        // model.addConstr(nodeVarOut <= targetPeriod, "pathOut_period");
-        // model.addConstr(
-        //     nodeVarOut - nodeVarIn + bigConstant * nodeBufVar.value() >= 0,
-        //     "buf_delay");
-      } else {
-        // means it is an input
-        nodeVarIn =
-            model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node->str());
-        nodeVarOut = nodeVarIn;
-        if (node->isPrimaryInput()) {
-          model.addConstr(nodeVarIn == 0, "input_delay");
-        } else {
-          model.addConstr(nodeVarIn <= targetPeriod, "clock_period_constraint");
-        }
+        continue;
       }
-      model.update();
-      continue;
     }
+
     nodeVarIn = model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node->str());
     nodeVarOut = nodeVarIn;
     if (node->isPrimaryInput()) {
@@ -513,6 +377,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes(
     } else {
       model.addConstr(nodeVarIn <= targetPeriod, "clock_period_constraint");
     }
+
     model.update();
   }
 }
@@ -534,31 +399,6 @@ void MAPBUFBuffers::addClockPeriodConstraintsChannels(Value channel,
   model.addConstr(t2 - t1 + bigConstant * bufVarSignal >= 0, "buf_delay");
 }
 
-void MAPBUFBuffers::retrieveFPGA20Constraints(GRBModel &model) {
-  std::ifstream file(blifFile.str() + "./fpga20_results.txt");
-  std::string line;
-  while (std::getline(file, line)) {
-    std::istringstream iss(line);
-    std::string varName;
-    double value;
-    if (iss >> varName >> value) {
-      // Retrieve the Gurobi variable corresponding to varName
-      auto varOpt = variableExists(model, varName);
-      if (!varOpt) {
-        // llvm::errs() << "Variable " << varName << " not found in the model."
-        //              << "\n";
-        continue;
-      }
-      GRBVar var = varOpt.value();
-      // Add the equality constraint
-      // llvm::errs() << "Adding constraint: " << varName << " == " << value
-      //              << "\n";
-      model.addConstr(var == value, "fpga20_results");
-    }
-  }
-  file.close();
-}
-
 using pathMap = std::unordered_map<
     std::pair<experimental::Node *, experimental::Node *>,
     std::vector<experimental::Node *>,
@@ -567,62 +407,155 @@ using pathMap = std::unordered_map<
 std::vector<experimental::Node *>
 getOrCreateLeafToRootPath(experimental::Node *key, experimental::Node *leaf,
                           pathMap leafToRootPaths,
-                          experimental::BlifData &anchorsRemoved) {
+                          experimental::BlifData &blif) {
   // Check if the path from leaf to root has already been computed, if not then
   // compute it, if so then return it. Returns the shortest path by running BFS.
   auto leafKeyPair = std::make_pair(leaf, key);
-
   if (leafToRootPaths.find(leafKeyPair) != leafToRootPaths.end()) {
     return leafToRootPaths[leafKeyPair];
   }
 
-  auto path = anchorsRemoved.findPath(leaf, key);
+  auto path = blif.findPath(leaf, key);
   if (!path.empty()) {
     // remove the starting node and the root node, as we should be able to place
     // buffers on channels adjacent to these nodes
-    path.pop_back();          // remove root
-    path.erase(path.begin()); // remove starting node
+    path.pop_back();
+    path.erase(path.begin());
   }
 
   leafToRootPaths[leafKeyPair] = path;
   return path;
 }
 
+void MAPBUFBuffers::placeBuffersHelper(Value &channel, Operation *outputOp) {
+  auto *inputOp = channel.getDefiningOp();
+  handshake::ChannelBufProps &resProps = channelProps[channel];
+  if (resProps.maxTrans.value_or(1) >= 1) {
+    GRBVar &bufVar =
+        vars.channelVars[channel].signalVars[SignalType::READY].bufPresent;
+    model.addConstr(bufVar == 1, "backedge_ready");
+  }
+  if (resProps.maxOpaque.value_or(1) >= 1) {
+    GRBVar &bufVar =
+        vars.channelVars[channel].signalVars[SignalType::DATA].bufPresent;
+    model.addConstr(bufVar == 1, "backedge_data");
+  }
+  std::string oehbStr = "oehb";
+  std::string tehbStr = "tehb";
+  experimental::BufferSubjectGraph *oehb =
+      new experimental::BufferSubjectGraph(inputOp, outputOp, oehbStr);
+  experimental::BufferSubjectGraph *tehb =
+      new experimental::BufferSubjectGraph(oehb, outputOp, tehbStr);
+}
+
+void processBackedges(handshake::FuncOp funcOp,
+                      std::function<void(Value &, Operation *)> helper) {
+  // Find all loopbacks in the function and process them using the provided
+  // function. Helper function takes 2 inputs, one for the channel and one for
+  // the output operation
+  funcOp.walk([&](mlir::Operation *op) {
+    for (Value result : op->getResults()) {
+      for (Operation *user : result.getUsers()) {
+        if (isBackedge(result, user)) {
+          helper(result, user);
+        }
+      }
+    }
+  });
+}
+
+void MAPBUFBuffers::addCutLoopbackBuffers() {
+  // Add constraints to ensure that the loopback buffers are placed. Simply loop
+  // over all the channels and check if the channel is a back edge.
+  auto funcOp = funcInfo.funcOp;
+  processLoopbacks(funcOp, placeBuffersHelper);
+}
+
+void MAPBUFBuffers::findMinimumFeedbackArcSet() {
+  GRBEnv envFeedback = GRBEnv(true);
+  envFeedback.set(GRB_IntParam_OutputFlag, 0);
+  envFeedback.start();
+  GRBModel modelFeedback = GRBModel(envFeedback);
+
+  int numOps = 0;
+  DenseMap<Operation *, GRBVar> opToGRB;
+  funcInfo.funcOp.walk([&](Operation *op) {
+    ++numOps;
+    StringRef uniqueName = getUniqueName(op);
+    GRBVar operationVariable = modelFeedback.addVar(
+        0, GRB_INFINITY, 0.0, GRB_INTEGER, uniqueName.str());
+    opToGRB[op] = operationVariable;
+  });
+
+  modelFeedback.update();
+
+  DenseMap<std::pair<Operation *, Operation *>, GRBVar> edgeToOps;
+
+  funcInfo.funcOp.walk([&](Operation *op) {
+    // Add constraints for the operations that come after the current operation
+    for (Operation *user : op->getUsers()) {
+      GRBVar currentOpVar = opToGRB[op];
+      GRBVar userOpVar = opToGRB[user];
+      GRBVar edge = modelFeedback.addVar(
+          0, 1, 0.0, GRB_BINARY,
+          (getUniqueName(op) + "_" + getUniqueName(user)).str());
+      edgeToOps[std::make_pair(op, user)] = edge;
+      model.update();
+      modelFeedback.addConstr(userOpVar - currentOpVar + 100 * edge >= 1,
+                              "operation_order");
+    }
+  });
+
+  modelFeedback.update();
+
+  GRBLinExpr obj = 0;
+  for (const auto &entry : edgeToOps) {
+    obj += entry.second;
+  }
+
+  modelFeedback.setObjective(obj, GRB_MINIMIZE);
+  modelFeedback.update();
+
+  if (!blifFile.empty())
+    modelFeedback.write(blifFile.str() + "_feedback_arc.lp");
+  modelFeedback.optimize();
+  if (!blifFile.empty())
+    modelFeedback.write(blifFile.str() + "_feedback_arc_solution.json");
+
+  for (const auto &entry : edgeToOps) {
+    auto edgeVar = entry.second;
+    auto ops = entry.first;
+    auto *inputOp = ops.first;
+    auto *outputOp = ops.second;
+    if (edgeVar.get(GRB_DoubleAttr_X) > 0) {
+      for (Value operand : outputOp->getOperands()) {
+        // for (Value result : inputOp->getResults()) {
+        if (!operand.getDefiningOp<handshake::MemoryOpInterface>() &&
+            !isa<handshake::MemoryOpInterface>(*operand.getUsers().begin())) {
+          // no buffers on MCs because they
+          // form self loops
+          if (operand.getDefiningOp() == inputOp) {
+            placeBuffersHelper(operand, outputOp);
+          }
+        }
+      }
+    }
+  }
+}
+
 void MAPBUFBuffers::setup() {
-
-
   // Signals for which we have variables
   SmallVector<SignalType, 4> signals;
   signals.push_back(SignalType::DATA);
   signals.push_back(SignalType::VALID);
   signals.push_back(SignalType::READY);
 
-  experimental::BlifParser parser;
-  // experimental::BlifData *anchorsRemoved =
-  //     parser.parseBlifFile(blifFile.str() + "noAnchors.blif");
-    experimental::BlifData *anchorsRemoved =
-      parser.parseBlifFile("/home/oyasar/full_integration/dynamatic_generated_after/merged.blif");
-
-  // experimental::BlifData *withAnchors =
-  //     parser.parseBlifFile(blifFile.str() + "anchored.blif");
-
-  // Run cut enumeration on the both versions of the subject graph, with anchors
-  // and without anchors. Cut enumeration with anchors give us the cuts such
-  // that every node is enumerated until the channels. Cut enumeration without
-  // anchors give us the deepest cuts.
-  experimental::Cuts cutsAnchorsRemoved(*anchorsRemoved, 6, 0);
-  cutsAnchorsRemoved.runCutAlgos(false, true, false, false);
-
-  // experimental::Cuts cutsWithAnchors(withAnchors, 6, 0);
-  // cutsWithAnchors.runCutAlgos(false, true, false, true);
-  experimental::Cuts::printCuts("cuts.txt");
-
   /// NOTE: (lucas-rami) For each buffering group this should be the timing
-  /// model of the buffer that will be inserted by the MILP for this group. We
-  /// don't have models for these buffers at the moment therefore we provide a
-  /// null-model to each group, but this hurts our placement's accuracy.
+  /// model of the buffer that will be inserted by the MILP for this group.
+  /// We don't have models for these buffers at the moment therefore we
+  /// provide a null-model to each group, but this hurts our placement's
+  /// accuracy.
   const TimingModel *bufModel = nullptr;
-
   BufferingGroup dataValidGroup({SignalType::DATA, SignalType::VALID},
                                 bufModel);
   BufferingGroup readyGroup({SignalType::READY}, bufModel);
@@ -631,10 +564,9 @@ void MAPBUFBuffers::setup() {
   bufGroups.push_back(dataValidGroup);
   bufGroups.push_back(readyGroup);
 
+  // Call the generator class to initialize the subject graphs of the modules
+  experimental::SubjectGraphGenerator subjectGraphGenerator(funcInfo.funcOp);
   std::vector<Value> allChannels;
-
-  GRBVar clockVar = model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "clock");
-  model.addConstr(clockVar == targetPeriod, "clock_period");
 
   for (auto &[channel, _] : channelProps) {
     // Create channel variables and constraints
@@ -658,102 +590,103 @@ void MAPBUFBuffers::setup() {
     addUnitElasticityConstraints(&op, channelFilter);
   }
 
-  // retrieveFPGA20Constraints(model);
-
-  addClockPeriodConstraintsNodes(*anchorsRemoved);
-
-  addBlackboxConstraints();
+  // // remove br modules from subject graph
+  // for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
+  //   auto *moduleGraph = module.first;
+  //   std::string &moduleType = moduleGraph->getModuleType();
+  //   if (moduleType == "br") {
+  //     // br has one input and one output
+  //     auto brInput = moduleGraph->getInputSubjectGraphs();
+  //     auto brOutput = moduleGraph->getOutputSubjectGraphs();
+  //     experimental::BaseSubjectGraph::changeInput(brOutput[0],
+  //     brInput[0],
+  //                                                 moduleGraph);
+  //     experimental::BaseSubjectGraph::changeOutput(brInput[0],
+  //     brOutput[0],
+  //                                                  moduleGraph);
+  //   }
+  // }
 
   addCutLoopbackBuffers();
+  // findMinimumFeedbackArcSet();
 
+  // Create a directory named "submodules" under blifFile.str()
+  std::string submodulesDir = blifFile.str() + "submodules";
+  if (!std::filesystem::create_directory(submodulesDir)) {
+    llvm::errs() << "Failed to create directory: " << submodulesDir << "\n";
+  }
+
+  for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
+    std::string &uniqueName = module.first->getUniqueNameGraph();
+    module.first->connectInputNodes();
+    module.first->getBlifData()->generateBlifFile(
+        blifFile.str() + "submodules/" + uniqueName + ".blif");
+  }
+
+  experimental::BlifData *mergedBlif = new experimental::BlifData();
+  for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
+    experimental::BlifData *blifModule = module.first->getBlifData();
+    for (auto &latch : blifModule->getLatches()) {
+      mergedBlif->addLatch(latch.first, latch.second);
+    }
+    for (auto &node : blifModule->getNodesInOrder()) {
+      mergedBlif->addNode(node);
+    }
+  }
+
+  mergedBlif->traverseNodes();
+  mergedBlif->setModuleName("merged");
+  mergedBlif->generateBlifFile(blifFile.str() + "merged.blif");
+
+  experimental::Cuts cutsAnchorsRemoved(mergedBlif, 6, 0);
+  cutsAnchorsRemoved.runCutAlgos(false, true, true);
+  experimental::Cuts::printCuts("cuts.txt");
+
+  addClockPeriodConstraintsNodes(*mergedBlif);
+  addBlackboxConstraints();
   addCutSelectionConstraints();
-
-  // for (auto *node : anchorsRemoved.getNodesInOrder()) {
-  //   auto *anchoredNode = withAnchors.getNodeByName(node->str());
-  //   if (anchoredNode) {
-  //     *anchoredNode = *node;
-  //   }
-  // }
-
-  // for (auto &[key, val] : experimental::Cuts::cuts) {
-  //   for (auto &cut : val) {
-  //     for (auto *leaf : cut.leaves) {
-  //       auto *anchoredLeaf = withAnchors.getNodeByName(leaf->str());
-  //       if (anchoredLeaf) {
-  //         *anchoredLeaf = *leaf;
-  //       }
-  //     }
-  //     auto *anchoredRoot = withAnchors.getNodeByName(key->str());
-  //     if (anchoredRoot) {
-  //       *anchoredRoot = *key;
-  //     }
-  //   }
-  // }
-
-  // for (auto &node : anchorsRemoved.getNodes()) {
-  //   GRBVar &nodeVar = nodeToGRB[node];
-  //   nodeVar = model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node);
-  //   model.update();
-  //   if (anchorsRemoved.isPrimaryInput(node)) {
-  //     model.addConstr(nodeVar == 0, "primary_input");
-
-  //     // if (anchorsRemoved.isConstantNode(node)) {
-  //     //   std::string pathInName = retrieveChannelName(node,
-  //     "pathIn").str();
-  //     //   GRBVar nodeVarChannel =
-  //     //       pathInSearcher.variableIncludes(pathInName, nodeToGRB, node);
-
-  //     //   model.addConstr(nodeVar == nodeVarChannel,
-  //     "primary_input_channel");
-  //     // }
-  //   } else {
-  //     model.addConstr(nodeVar <= clockVar, "clock_period_constraint");
-  //   }
-  // }
-  // model.update();
-
   model.update();
-  int n = experimental::Cuts::cuts.size();
+
   pathMap leafToRootPaths;
-  for (int i = 0; i < n; ++i) {
+  for (auto &rootCutPair : experimental::Cuts::cuts) {
     // Loop over each subject graph edge
-    auto it = std::next(experimental::Cuts::cuts.begin(), i);
-    auto *key = it->first;
-    auto &val = it->second;
+    auto *root = rootCutPair.first;
+    auto &cutVector = rootCutPair.second;
 
-    // llvm::errs() << "Adding constraints for node: " << key->str() << "\n";
+    // llvm::errs() << "Adding constraints for node: " << key->str() <<
+    // "\n";
 
-    // Retrieve the Gurobi variable corresponding to the subject graph edge. If
-    // the edge corresponds to a dataflow channel, then we need to retrieve the
-    // variable corresponding to the pathIn of the channel.
-    std::set<experimental::Node *> fanIns = key->getFanins();
+    // Retrieve the Gurobi variable corresponding to the subject graph edge.
+    // If the edge corresponds to a dataflow channel, then we need to
+    // retrieve the variable corresponding to the pathIn of the channel.
+    GRBVar &nodeVar = root->gurobiVars->tIn;
+    std::set<experimental::Node *> fanIns = root->getFanins();
 
-    GRBVar &nodeVar = key->gurobiVars->tIn;
     if (fanIns.size() == 1) {
-      // if a node has single fanin, then it is not mapped to LUTs. The delay of
-      // the node is equal to the delay of the fanin.
-      // No cut should be selected for these nodes, the other cuts are present
-      // for the correct cut enumeration.
-      GRBVar &faninVar = (*fanIns.begin())->gurobiVars->tOut;
+      // if a node has single fanin, then it is not mapped to LUTs. The
+      // delay of the node is equal to the delay of the fanin. No cut should
+      // be selected for these nodes, the other cuts are present for the
+      // correct cut enumeration.
+
       // llvm::errs() << "Adding single fanin delay constraint for fanin: "
       //              << (*fanIns.begin())->str() << "\n";
+      GRBVar &faninVar = (*fanIns.begin())->gurobiVars->tOut;
       model.addConstr(nodeVar == faninVar, "single_fanin_delay");
-
       continue;
     }
 
-    for (auto &cut : val) {
+    for (auto &cut : cutVector) {
       // Loop over each cut of the subject graph edge
       GRBVar &cutSelectionVar = cut.cutSelection;
-      if ((cut.leaves.size() == 1) && (*cut.leaves.begin() == key)) {
-        // if the cut has a single leaf and it is equal to the root node, then
-        // it's the trivial cut. The LUT is created by the fanins of the root
-        // node.
+      if ((cut.leaves.size() == 1) && (*cut.leaves.begin() == root)) {
+        // if the cut has a single leaf and it is equal to the root node,
+        // then it's the trivial cut. The LUT is created by the fanins of
+        // the root node.
         for (auto &fanIn : fanIns) {
-          GRBVar &faninVar = fanIn->gurobiVars->tOut;
-          // llvm::errs() << "Adding trivial cut delay constraint for fanin: "
+          // llvm::errs() << "Adding trivial cut delay constraint for fanin:
+          // "
           //              << fanIn->str() << "\n";
-
+          GRBVar &faninVar = fanIn->gurobiVars->tOut;
           model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
                               faninVar + lutDelay,
                           "trivial_cut_delay");
@@ -763,32 +696,32 @@ void MAPBUFBuffers::setup() {
 
       for (auto *leaf : cut.leaves) {
         // Loop over each leaf of the cut
-
-        // Retrieve the Gurobi variable corresponding to the leaf. If the leaf
-        // is a dataflow channel, then retrieve the pathOut variable of the
-        // channel.
-        GRBVar &leafVar = leaf->gurobiVars->tOut;
+        // Retrieve the Gurobi variable corresponding to the leaf. If the
+        // leaf is a dataflow channel, then retrieve the pathOut variable of
+        // the channel.
 
         // llvm::errs() << "Adding delay propagation constraint for fanin: "
-        //              << leaf->str() << " and leaf: " << leaf->str() << "\n";
+        //              << leaf->str() << " and leaf: " << leaf->str() <<
+        //              "\n";
         // Add the delay propagation constraint
+
+        GRBVar &leafVar = leaf->gurobiVars->tOut;
         model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
                             leafVar + lutDelay,
                         "delay_propagation");
 
         // Get the path from the leaf to the root
         std::vector<experimental::Node *> path;
-
-        path = getOrCreateLeafToRootPath(key, leaf, leafToRootPaths,
-                                         *anchorsRemoved);
-
+        path =
+            getOrCreateLeafToRootPath(root, leaf, leafToRootPaths, *mergedBlif);
         for (auto &nodePath : path) {
           // Loop over edges in the path from the leaf to the root. Add cut
-          // selection conflict constraints for channels that are on the path.
+          // selection conflict constraints for channels that are on the
+          // path.
           if (nodePath->gurobiVars->bufferVar.has_value()) {
             // llvm::errs()
-                // << "Adding cut selection conflict constraint for node: "
-                // << key->str() << " and leaf: " << leaf->str() << "\n";
+            //     << "Adding cut selection conflict constraint for node: "
+            //     << key->str() << " and leaf: " << leaf->str() << "\n";
             model.addConstr(1 >= nodePath->gurobiVars->bufferVar.value() +
                                      cutSelectionVar,
                             "cut_selection_conflict");
@@ -811,9 +744,6 @@ void MAPBUFBuffers::setup() {
   }
 
   addObjective(allChannels, cfdfcs);
-  // model.set(GRB_IntParam_DualReductions, 0);
-  llvm::errs() << "model marked ready to optimize"
-               << "\n";
   markReadyToOptimize();
 }
 

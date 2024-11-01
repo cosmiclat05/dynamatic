@@ -50,7 +50,8 @@ struct HandshakePlaceBuffersPass
   /// Trivial field-by-field constructor.
   HandshakePlaceBuffersPass(StringRef algorithm, StringRef frequencies,
                             StringRef timingModels, bool firstCFDFC,
-                            double targetCP, unsigned timeout, bool dumpLogs, StringRef blifFile = "");
+                            double targetCP, unsigned timeout, bool dumpLogs,
+                            StringRef blifFile = "");
 
   /// Called on the MLIR module provided as input.
   void runDynamaticPass() override;

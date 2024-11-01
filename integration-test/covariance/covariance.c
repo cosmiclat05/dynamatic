@@ -23,7 +23,7 @@ void covariance(inout_int_t data[30][30], out_int_t symmat[30][30],
     int x = 0;
     for (i = 0; i < 30; i++)
       x += data[i][j];
-    mean[j] = x / float_n;
+    mean[j] = x * float_n;
   }
 
   /* Center the column vectors. */

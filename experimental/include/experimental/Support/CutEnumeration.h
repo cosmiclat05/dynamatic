@@ -75,11 +75,11 @@ public:
   static inline std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
                                    NodePtrEqual>
       cuts;
-  experimental::BlifData blif;
+  experimental::BlifData* blif;
   int lutSize{};
   int maxExpansion{};
 
-  Cuts(BlifData &blif, int lutSize, int maxExpansion)
+  Cuts(BlifData *blif, int lutSize, int maxExpansion)
       : blif(blif), lutSize(lutSize), maxExpansion(maxExpansion){};
 
   std::vector<Cut> enumerateCuts(Node *node,
@@ -91,9 +91,9 @@ public:
   cutless();
   std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
   cutlessReal();
-
-  void runCutAlgos(bool computeAllCuts, bool cutless, bool cutlessReal,
-                   bool anchors);
+  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+  cutlessChannels();
+  void runCutAlgos(bool computeAllCuts, bool cutless, bool cutlessChannelsBool);
   void readFromFile(const std::string &filename);
   static void printCuts(std::string filename);
 
@@ -110,8 +110,6 @@ public:
     }
     return std::vector<Cut>();
   }
-
-  // Method to read from file and populate cuts
 };
 
 } // namespace experimental

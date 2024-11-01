@@ -45,7 +45,7 @@ void Cuts::readFromFile(const std::string &filename) {
       for (int i = 0; i < numberOfCuts; i++) {
         std::getline(file, line);
         if (line.substr(0, 5) == "Cut #") {
-          Node *node = blif.getNodeByName(nodeName);
+          Node *node = blif->getNodeByName(nodeName);
           Cut newCut(node);
           std::istringstream iss(line);
           std::string dummy;
@@ -53,7 +53,7 @@ void Cuts::readFromFile(const std::string &filename) {
           for (int j = 0; j < cutSize; ++j) {
             std::getline(file, line);
             leaf = line.substr(1); // Remove leading tab
-            newCut.addLeaf(blif.getNodeByName(leaf));
+            newCut.addLeaf(blif->getNodeByName(leaf));
           }
           addCut(node, newCut);
         } else {
@@ -179,26 +179,94 @@ Cuts::enumerateCuts(Node *node, const std::vector<std::vector<Cut>> &faninCuts,
 std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
 Cuts::cutless() {
   int n = 0;
-  std::set<Node *> currentWavyLine = blif.getPrimaryInputs();
+  std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
   std::set<Node *> nextWavyLine;
   std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
       cutlessCuts;
 
   while (true) {
-    nextWavyLine = blif.findNodesWithLimitedWavyInputs(6, currentWavyLine);
+    nextWavyLine = blif->findNodesWithLimitedWavyInputs(6, currentWavyLine);
     if (nextWavyLine.size() == currentWavyLine.size()) {
       break;
     }
 
     for (auto *node : nextWavyLine) {
       cutlessCuts[node].emplace_back(
-          node, blif.findWavyInputsOfNode(node, currentWavyLine), n);
+          node, blif->findWavyInputsOfNode(node, currentWavyLine), n);
     }
 
     n++;
     // currentWavyLine = nextWavyLine;
     currentWavyLine.insert(nextWavyLine.begin(), nextWavyLine.end());
     llvm::errs() << n << " " << currentWavyLine.size() << "\n";
+  }
+
+  for (auto &[node, cuts] : cutlessCuts) {
+    cuts.erase(std::unique(cuts.begin(), cuts.end(),
+                           [](Cut &a, Cut &b) {
+                             const auto &leavesA = a.getLeaves();
+                             const auto &leavesB = b.getLeaves();
+
+                             // Compare the sizes first as an optimization
+                             if (leavesA.size() != leavesB.size()) {
+                               return false;
+                             }
+
+                             // Compare elements in the set based on Node's name
+                             // strings
+                             return std::equal(
+                                 leavesA.begin(), leavesA.end(),
+                                 leavesB.begin(), leavesB.end(),
+                                 [](const Node *nodeA, const Node *nodeB) {
+                                   return nodeA->getName() == nodeB->getName();
+                                 });
+                           }),
+               cuts.end());
+  }
+
+  return cutlessCuts;
+}
+
+bool isChannelVarCut(const std::string &node) {
+  // a hacky way to determine if a variable is a channel variable.
+  // if it includes "new", "." and does not include "_", it is not a channel
+  // variable
+  return node.find("new") == std::string::npos &&
+         node.find('.') == std::string::npos &&
+         node.find('_') != std::string::npos;
+}
+
+std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+Cuts::cutlessChannels() {
+  int n = 0;
+  std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
+  for (auto *channel : blif->getChannels()) {
+    currentWavyLine.insert(channel);
+  }
+
+  std::set<Node *> nextWavyLine;
+  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+      cutlessCuts;
+
+  std::set<Node *> previousWavyLine;
+  while (true) {
+    nextWavyLine = blif->findNodesWithLimitedWavyInputs(6, currentWavyLine);
+
+    for (auto *node : nextWavyLine) {
+      cutlessCuts[node].emplace_back(
+          node, blif->findWavyInputsOfNode(node, currentWavyLine), n);
+    }
+
+    n++;
+    llvm::errs() << n << " " << currentWavyLine.size() << "\n";
+    previousWavyLine = currentWavyLine;
+    currentWavyLine.insert(nextWavyLine.begin(), nextWavyLine.end());
+
+    if (nextWavyLine.size() == currentWavyLine.size() || currentWavyLine.size() == previousWavyLine.size()) {
+      break;
+    }
+
+
   }
 
   for (auto &[node, cuts] : cutlessCuts) {
@@ -234,7 +302,7 @@ Cuts::computeAllCuts() {
   std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
       cutResults;
 
-  for (auto *node : blif.getNodesInOrder()) {
+  for (auto *node : blif->getNodesInOrder()) {
     if (node->isPrimaryInput()) {
       cutResults[node].emplace_back(node, node, 0);
       continue;
@@ -311,7 +379,7 @@ Cuts::computeAllCuts() {
 }
 
 void Cuts::runCutAlgos(bool computeAllCutsBool, bool cutlessBool,
-                       bool cutlessRealBool, bool anchors) {
+                       bool cutlessChannelsBool) {
 
   std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
       tempCuts;
@@ -334,53 +402,20 @@ void Cuts::runCutAlgos(bool computeAllCutsBool, bool cutlessBool,
                             cutVector.end());
     }
   }
-  // if (cutlessRealBool){
-  //   auto cutsTemp1 = cutlessReal();
-  //   for (auto &pair : cutsTemp1) {
-  //     Node* node = pair.first;
-  //     std::vector<Cut> &cutVector = pair.second;
-  //     tempCuts[node].insert(tempCuts[node].end(), cutVector.begin(),
-  //     cutVector.end());
-  //   }
-  // }
-
-  if (!anchors) {
-    for (auto &pair : tempCuts) {
+  if (cutlessChannelsBool) {
+    auto cutsTemp1 = cutlessChannels();
+    for (auto &pair : cutsTemp1) {
       Node *node = pair.first;
       std::vector<Cut> &cutVector = pair.second;
-      cuts[node].insert(cuts[node].end(), cutVector.begin(), cutVector.end());
+      tempCuts[node].insert(tempCuts[node].end(), cutVector.begin(),
+                            cutVector.end());
     }
-  } else {
-    for (auto &pair : tempCuts) {
-      std::vector<std::string> namesToRemove = {
-          "__data_anchors_out", "__data_anchors_in", "__anchors_out",
-          "__anchors_in"};
-      auto removeAnchorsUtil = [namesToRemove](Node *node) {
-        for (auto &nameToRemove : namesToRemove) {
-          size_t pos = node->str().find(nameToRemove);
-          if (pos != std::string::npos) {
-            node->setName(
-                node->str().erase(pos, std::string(nameToRemove).length()));
-            break;
-          }
-        }
-      };
+  }
 
-      Node *node = pair.first;
-      std::vector<Cut> &cutVector = pair.second;
-      removeAnchorsUtil(node);
-
-      for (auto &cut : cutVector) {
-        Node *root = cut.root;
-        removeAnchorsUtil(root);
-        std::set<Node *> leaves = cut.leaves;
-        for (const auto &leaf : leaves) {
-          removeAnchorsUtil(leaf);
-        }
-      }
-
-      cuts[node].insert(cuts[node].end(), cutVector.begin(), cutVector.end());
-    }
+  for (auto &pair : tempCuts) {
+    Node *node = pair.first;
+    std::vector<Cut> &cutVector = pair.second;
+    cuts[node].insert(cuts[node].end(), cutVector.begin(), cutVector.end());
   }
 
   for (auto &[node, cutVector] : cuts) {

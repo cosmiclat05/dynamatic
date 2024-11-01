@@ -25,9 +25,7 @@
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
-#include "experimental/Support/BlifReader.h"
 #include "experimental/Support/StdProfiler.h"
-#include "experimental/Support/SubjectGraph.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
@@ -493,6 +491,21 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
+void processBackedges(handshake::FuncOp funcOp,
+                      std::function<void(Value&, Operation*)> helper) {
+  // Find all loopbacks in the function and process them using the provided
+  // function. Helper function takes 2 inputs, one for the channel and one for the output operation
+  funcOp.walk([&](mlir::Operation *op) {
+    for (Value result : op->getResults()) {
+      for (Operation *user : result.getUsers()) {
+        if (isBackedge(result, user)) {
+          helper(result, user);
+        }
+      }
+    }
+  });
+}
+
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   // Read the operations' timing models from disk
   TimingDatabase timingDB(&getContext());
@@ -507,6 +520,26 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     if (failed(mapChannelsToProperties(funcOp, timingDB, channelProps)))
       return failure();
 
+    auto adjustBufferingConstraints = [&](Value &channel, Operation *op = nullptr) {
+      ChannelBufProps &resProps = channelProps[channel];
+      if (resProps.maxTrans.value_or(1) >= 1) {
+        resProps.minTrans = std::max(resProps.minTrans, 1U);
+      } else {
+        channel.getDefiningOp()->emitWarning()
+            << "Cannot place transparent buffer on operation's "
+               "output due to channel-specific buffering constraints. This "
+               "may yield an invalid buffering.";
+      }
+      if (resProps.maxOpaque.value_or(1) >= 1) {
+        resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+      } else {
+        channel.getDefiningOp()->emitWarning()
+            << "Cannot place opaque buffer on operation's "
+               "output due to channel-specific buffering constraints. This "
+               "may yield an invalid buffering.";
+      }
+    };
+
     if (algorithm == ON_MERGES) {
       // The only strategy at this point is to place buffers on the output
       // channels of all merge-like operations. We still want to respect
@@ -517,59 +550,14 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       // have at least one opaque and one transparent slot, unless a constraint
       // explicitly prevents us from putting a buffer there
       for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
-        ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
-        if (resProps.maxTrans.value_or(1) >= 1) {
-          resProps.minTrans = std::max(resProps.minTrans, 1U);
-        } else {
-          mergeLikeOp->emitWarning()
-              << "Cannot place transparent buffer on merge-like operation's "
-                 "output due to channel-specific buffering constraints. This "
-                 "may "
-                 "yield an invalid buffering.";
-        }
-        if (resProps.maxOpaque.value_or(1) >= 1) {
-          resProps.minOpaque = std::max(resProps.minOpaque, 1U);
-        } else {
-          mergeLikeOp->emitWarning()
-              << "Cannot place opaque buffer on merge-like operation's "
-                 "output due to channel-specific buffering constraints. This "
-                 "may "
-                 "yield an invalid buffering.";
-        }
+        Value result = mergeLikeOp->getResult(0);
+        adjustBufferingConstraints(result);
       }
     }
 
     if (algorithm == CUT_LOOPBACKS) {
       // Make sure that all the loops are cut by placing at least one buffer
-      funcOp.walk([&](mlir::Operation *op) {
-        for (Value result : op->getResults()) {
-          for (Operation *user : result.getUsers()) {
-            if (isBackedge(result, user)) {
-              ChannelBufProps &resProps = channelProps[result];
-              if (resProps.maxTrans.value_or(1) >= 1) {
-                resProps.minTrans = std::max(resProps.minTrans, 1U);
-              } else {
-                op->emitWarning()
-                    << "Cannot place transparent buffer on loopback "
-                       "due to channel-specific buffering constraints. "
-                       "This "
-                       "may "
-                       "yield an invalid buffering.";
-              }
-              if (resProps.maxOpaque.value_or(1) >= 1) {
-                resProps.minOpaque = std::max(resProps.minOpaque, 1U);
-              } else {
-                op->emitWarning()
-                    << "Cannot place opaque buffer on loopback "
-                       "due to channel-specific buffering constraints. "
-                       "This "
-                       "may "
-                       "yield an invalid buffering.";
-              }
-            }
-          }
-        }
-      });
+      processBackedges(funcOp, adjustBufferingConstraints);
     }
 
     // Place the minimal number of buffers (as specified by the buffering
@@ -582,35 +570,6 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       placement[channel] = result;
     }
     instantiateBuffers(placement);
-
-    funcOp.walk(
-        [&](Operation *op) { (experimental::OperationDifferentiator(op)); });
-
-    for (auto &module : experimental::OperationDifferentiator::moduleMap) {
-      std::string uniqueName = getUniqueName(module.first).str();
-      llvm::errs() << "Unique Name: " << uniqueName << "\n";
-      module.second->connectInputNodes();
-      module.second->getBlifData()->generateBlifFile(
-          "/home/oyasar/full_integration/dynamatic_generated_after/" +
-          uniqueName + ".blif");
-    }
-
-    experimental::BlifData mergedBlif;
-    for (auto &module : experimental::OperationDifferentiator::moduleMap) {
-      std::string uniqueName = getUniqueName(module.first).str();
-      llvm::errs() << "Unique Name: " << uniqueName << "\n";
-      experimental::BlifData *blifModule = module.second->getBlifData();
-      for (auto &latch : blifModule->getLatches()) {
-        mergedBlif.addLatch(latch.first, latch.second);
-      }
-      for (auto &node : blifModule->getAllNodes()) {
-        mergedBlif.addNode(node);
-      }
-    }
-    mergedBlif.traverseNodes();
-    mergedBlif.setModuleName("merged");
-    mergedBlif.generateBlifFile(
-        "/home/oyasar/full_integration/dynamatic_generated_after/merged.blif");
   }
   return success();
 }

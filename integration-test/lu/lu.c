@@ -9,6 +9,7 @@
 #include "dynamatic/Integration.h"
 #include "lu.h"
 #include <math.h>
+#include <stdlib.h>
 
 void lu(in_float_t A[N][N], inout_float_t L[N][N], inout_float_t U[N][N],
         inout_float_t P[N][N], in_float_t A_prime[N][N]) {
@@ -23,7 +24,7 @@ void lu(in_float_t A[N][N], inout_float_t L[N][N], inout_float_t U[N][N],
   for (int i = 0; i < N; i++) {
     int max_j = i;
     for (int j = i; j < N; j++) {
-      if (fabs(A[j][i]) > fabs(A[max_j][i]))
+      if ((A[j][i]) > (A[max_j][i]))
         max_j = j;
     }
     if (max_j != i)
@@ -47,7 +48,7 @@ void lu(in_float_t A[N][N], inout_float_t L[N][N], inout_float_t U[N][N],
   // Final part
   for (int i = 0; i < N; i++)
     for (int j = 0; j < N; j++) {
-      double s;
+      int s;
       if (j <= i) {
         s = 0;
         for (int k = 0; k < j; k++) {
@@ -60,7 +61,7 @@ void lu(in_float_t A[N][N], inout_float_t L[N][N], inout_float_t U[N][N],
         for (int k = 0; k < i; k++) {
           s += L[j][k] * U[k][i];
         }
-        L[j][i] = (A_prime[j][i] - s) / U[i][i];
+        L[j][i] = (A_prime[j][i] - s) * U[i][i];
       }
     }
 }

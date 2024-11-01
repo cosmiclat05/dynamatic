@@ -12,19 +12,19 @@
 #include "gsumif.h"
 #include <stdlib.h>
 
-float gsumif(in_float_t a[1000]) {
+int gsumif(in_float_t a[1000]) {
   int i;
-  float d;
-  float s = 0.0;
+  int d;
+  int s = 0.0;
 
   for (i = 0; i < 1000; i++) {
     d = a[i];
     if (d >= 0) {
-      float p;
+      int p;
       if (i > 5)
-        p = ((d + (float)0.25) * d + (float)0.5) * d + (float)0.125;
+        p = ((d + (int)0.25) * d + (int)0.5) * d + (int)0.125;
       else
-        p = ((d + (float)0.64) * d + (float)0.7) * d + (float)0.21;
+        p = ((d + (int)0.64) * d + (int)0.7) * d + (int)0.21;
       s += p;
     }
   }
@@ -38,8 +38,8 @@ int main(void) {
   in_float_t b[1000];
 
   for (int i = 0; i < 1000; ++i) {
-    a[i] = (float)1 - i;
-    b[i] = (float)i + 10;
+    a[i] = (int)1 - i;
+    b[i] = (int)i + 10;
 
     if (i % 100 == 0)
       a[i] = i;

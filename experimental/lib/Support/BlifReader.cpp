@@ -110,6 +110,7 @@ BlifData* BlifParser::parseBlifFile(const std::string &filename) {
       while (iss >> input) {
         Node *inputNode = data->createNode(input);
         inputNode->setInput(true);
+        inputNode->setChannelEdge(true);
       }
     }
 
@@ -120,6 +121,7 @@ BlifData* BlifParser::parseBlifFile(const std::string &filename) {
       while (iss >> output) {
         Node *outputNode = data->createNode(output);
         outputNode->setOutput(true);
+        outputNode->setChannelEdge(true);
       }
     }
 
@@ -343,9 +345,21 @@ BlifData::findNodesWithLimitedWavyInputs(size_t limit,
   std::set<Node *> nodesWithLimitedPrimaryInputs;
 
   for (auto &node : nodesTopologicalOrder) {
+    bool erased = false;
+    if (node->isChannelEdge){
+      if (wavyLine.count(node) > 0) {
+        wavyLine.erase(node);
+        erased = true;
+      }
+    }
+        // llvm::errs() << "Node: " << node->str() << " Wavy Inputs: ";
     std::set<Node *> wavyInputs = findWavyInputsOfNode(node, wavyLine);
     if (wavyInputs.size() <= limit) {
       nodesWithLimitedPrimaryInputs.insert(node);
+    }
+
+    if (erased) {
+      wavyLine.insert(node);
     }
   }
   return nodesWithLimitedPrimaryInputs;
@@ -362,11 +376,13 @@ std::set<Node *> BlifData::findWavyInputsOfNode(Node *node,
     visited.insert(currentNode);
 
     if (wavyLine.count(currentNode) > 0) {
+      // llvm::errs() << "Wavy Input: " << currentNode->str() << "\n";
       primaryInputs.insert(currentNode);
       return;
     }
 
     for (const auto &fanin : currentNode->getFanins()) {
+      // llvm::errs() << "Fanin: " << fanin->str() << "\n";
       dfs(fanin);
     }
   };

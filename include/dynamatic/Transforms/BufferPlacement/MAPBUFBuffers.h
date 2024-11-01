@@ -23,6 +23,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
+#include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutEnumeration.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -74,13 +75,11 @@ protected:
 
 private:
   StringRef blifFile;
-  float lutDelay = 0.5;
+  float lutDelay = 0.55;
   int bigConstant = 100;
 
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
-  void addMapbufConstraints(Value channel);
-
   void addCustomChannelConstraints(Value channel);
 
   void addCutSelectionConstraints();
@@ -89,12 +88,17 @@ private:
 
   void addBlackboxConstraints();
 
-  void addClockPeriodConstraintsNodes(
-      experimental::BlifData &blif);
+  void addClockPeriodConstraintsNodes(experimental::BlifData &blif);
+
+  void instantiateCutLoopbackBuffers(BufferPlacement &placement);
 
   void addClockPeriodConstraintsChannels(Value channel, SignalType signal);
 
   void retrieveFPGA20Constraints(GRBModel &model);
+
+  void findMinimumFeedbackArcSet();
+
+  static void placeBuffersHelper(Value &channel, Operation *outputOp);
 
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior

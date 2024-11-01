@@ -1,7 +1,7 @@
 #ifndef LU_LU_H
 #define LU_LU_H
-typedef float in_float_t;
-typedef float inout_float_t;
+typedef int in_float_t;
+typedef int inout_float_t;
 
 #define N 3
 

@@ -1,7 +1,5 @@
 set-dynamatic-path  .
 
-set-src             integration-test/matrix/matrix.c
-compile --buffer-algorithm mapbuf
-
-
-
+set-src             integration-test/fir/fir.c
+compile --buffer-algorithm cut-loopbacks
+exit

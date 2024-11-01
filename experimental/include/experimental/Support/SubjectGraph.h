@@ -44,6 +44,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Region.h"
 #include "mlir/IR/Value.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
@@ -82,16 +83,23 @@ struct ChannelSignals {
   Node *readySignal;
 };
 
-class BaseSubjectGraph;
-
 class BaseSubjectGraph {
-protected:
+public:
   static inline DenseMap<Operation *, BaseSubjectGraph *> moduleMap;
+  static inline DenseMap<BaseSubjectGraph *, Operation *> subjectGraphMap;
+
+protected:
   Operation *op;
   std::vector<Operation *> inputModules;
   std::vector<Operation *> outputModules;
   DenseMap<Operation *, unsigned int> inputModuleToResNum;
   DenseMap<Operation *, unsigned int> outputModuleToResNum;
+
+  std::vector<BaseSubjectGraph *> inputSubjectGraphs;
+  std::vector<BaseSubjectGraph *> outputSubjectGraphs;
+  DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResNum;
+  DenseMap<BaseSubjectGraph *, unsigned int> outputSubjectGraphToResNum;
+
   std::string fullPath = "/home/oyasar/full_integration/blif_files/";
   std::string moduleType;
   std::string uniqueName;
@@ -101,8 +109,10 @@ protected:
                      const std::string &nodeName);
 
 public:
+  BaseSubjectGraph() = default;
   BaseSubjectGraph(Operation *op) : op(op) {
     moduleMap[op] = this;
+    subjectGraphMap[this] = op;
     moduleType = op->getName().getStringRef();
     uniqueName = getUniqueName(op);
 
@@ -137,6 +147,75 @@ public:
     }
   }
 
+  BaseSubjectGraph(Operation *before, Operation *after) {
+    // Constructor for adding a buffer between two operations
+    auto *beforeSubjectGraph = moduleMap[before];
+    auto *afterSubjectGraph = moduleMap[after];
+    inputModules.push_back(before);
+    outputModules.push_back(after);
+    inputSubjectGraphs.push_back(beforeSubjectGraph);
+    outputSubjectGraphs.push_back(afterSubjectGraph);
+    inputModuleToResNum[before] = 0;
+  }
+
+  void replaceOpsBySubjectGraph() {
+    // add the input and output subject graphs
+    for (auto *inputModule : inputModules) {
+      auto *inputSubjectGraph = moduleMap[inputModule];
+      inputSubjectGraphs.push_back(inputSubjectGraph);
+      inputSubjectGraphToResNum[inputSubjectGraph] =
+          inputModuleToResNum[inputModule];
+    }
+
+    for (auto *outputModule : outputModules) {
+      auto *outputSubjectGraph = moduleMap[outputModule];
+      outputSubjectGraphs.push_back(outputSubjectGraph);
+      outputSubjectGraphToResNum[outputSubjectGraph] =
+          outputModuleToResNum[outputModule];
+    }
+  }
+
+  static unsigned int getChannelNumber(BaseSubjectGraph *first,
+                                       BaseSubjectGraph *second) {
+    return first->outputSubjectGraphToResNum[second];
+  }
+
+  static void changeOutput(BaseSubjectGraph *graph, BaseSubjectGraph *newOutput,
+                           BaseSubjectGraph *oldOutput) {
+    auto it = std::find(graph->outputSubjectGraphs.begin(),
+                        graph->outputSubjectGraphs.end(), oldOutput);
+    unsigned int channelNumber = 0;
+    if (it != graph->outputSubjectGraphs.end()) {
+      channelNumber = graph->outputSubjectGraphToResNum[oldOutput];
+      auto index = std::distance(graph->outputSubjectGraphs.begin(), it);
+      graph->outputSubjectGraphs.erase(it);
+      graph->outputSubjectGraphs.insert(
+          graph->outputSubjectGraphs.begin() + index, newOutput);
+      graph->outputSubjectGraphToResNum.erase(oldOutput);
+    } else {
+      llvm::errs() << "Output not found\n";
+    }
+    graph->outputSubjectGraphToResNum[newOutput] = channelNumber;
+  }
+
+  static void changeInput(BaseSubjectGraph *graph, BaseSubjectGraph *newInput,
+                          BaseSubjectGraph *oldInput) {
+    unsigned int channelNumber = 0;
+    auto it = std::find(graph->inputSubjectGraphs.begin(),
+                        graph->inputSubjectGraphs.end(), oldInput);
+    if (it != graph->inputSubjectGraphs.end()) {
+      auto index = std::distance(graph->inputSubjectGraphs.begin(), it);
+      graph->inputSubjectGraphs.erase(it);
+      graph->inputSubjectGraphs.insert(
+          graph->inputSubjectGraphs.begin() + index, newInput);
+      channelNumber = graph->inputSubjectGraphToResNum[oldInput];
+      graph->inputSubjectGraphToResNum.erase(oldInput);
+    } else {
+      llvm::errs() << "Input not found\n";
+    }
+    graph->inputSubjectGraphToResNum[newInput] = channelNumber;
+  }
+
   void appendVarsToPath(std::initializer_list<unsigned int> inputs) {
     fullPath += moduleType + "/";
     for (int input : inputs) {
@@ -151,6 +230,12 @@ public:
     beforeSignal->setOutput(false);
     beforeSignal->setInput(false);
     currentSignal->setOutput(false);
+    beforeSignal->setChannelEdge(true);
+    currentSignal->setChannelEdge(true);
+
+    if (beforeSignal->isBlackboxOutputNode()) {
+      beforeSignal->setInput(true);
+    }
 
     for (auto &fanout : currentSignal->getFanouts()) {
       fanout->getFanins().erase(currentSignal);
@@ -160,9 +245,27 @@ public:
     if (beforeSignal->getName().find("ready") != std::string::npos) {
       beforeSignal->setName(currentSignal->getName());
     }
+
+    currentSignal = beforeSignal;
   }
 
   BlifData *getBlifData() const { return blifData; }
+
+  static BaseSubjectGraph *getSubjectGraph(Operation *op) {
+    return moduleMap[op];
+  }
+
+  std::string &getUniqueNameGraph() { return uniqueName; }
+
+  std::string &getModuleType() { return moduleType; };
+
+  std::vector<BaseSubjectGraph *> getInputSubjectGraphs() {
+    return inputSubjectGraphs;
+  }
+
+  std::vector<BaseSubjectGraph *> getOutputSubjectGraphs() {
+    return outputSubjectGraphs;
+  }
 
   virtual ~BaseSubjectGraph() = default;
   virtual void connectInputNodes() = 0;
@@ -216,6 +319,10 @@ public:
       if (nodeName.find("result") != std::string::npos) {
         assignSignals(outputSignals, node, nodeName);
         node->setName(uniqueName + "_" + nodeName);
+        if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
+                           nodeName.find("ready") == std::string::npos)) {
+          node->setBlackboxOutput(true);
+        }
       } else if (nodeName.find("lhs") != std::string::npos) {
         assignSignals(inputNodes[0], node, nodeName);
       } else if (nodeName.find("rhs") != std::string::npos) {
@@ -233,11 +340,10 @@ public:
   void connectInputNodes() override {
     for (unsigned int i = 0; i < inputNodes.size(); i++) {
       auto &currentInputNodes = inputNodes[i];
-      auto *moduleBeforeOperation = inputModules[i];
-      auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+      auto *moduleBeforeSubjectGraph = inputSubjectGraphs[i];
       ChannelSignals &moduleBeforeOutputNodes =
           moduleBeforeSubjectGraph->returnOutputNodes(
-              inputModuleToResNum[moduleBeforeOperation]);
+              inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
       connectSignals(moduleBeforeOutputNodes.readySignal,
                      currentInputNodes.readySignal);
@@ -245,6 +351,7 @@ public:
                      moduleBeforeOutputNodes.validSignal);
 
       if (isBlackbox) {
+        // the input to the blackbox should stay as an output signal
         for (auto *node : currentInputNodes.dataSignals) {
           node->setInput(false);
           node->setOutput(false);
@@ -267,6 +374,7 @@ public:
 class CmpISubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
+  bool isBlackbox = false;
   std::unordered_map<unsigned int, ChannelSignals> inputNodes;
   ChannelSignals outputSignals;
 
@@ -278,6 +386,9 @@ public:
           dataWidth = handshake::getHandshakeTypeBitWidth(
               cmpIOp.getOperand(0).getType());
           appendVarsToPath({dataWidth});
+          if (dataWidth > 4) {
+            isBlackbox = true;
+          }
         })
         .Default([&](auto) {
           assert(false && "Operation does not match any supported type");
@@ -292,6 +403,10 @@ public:
       if (nodeName.find("result") != std::string::npos) {
         assignSignals(outputSignals, node, nodeName);
         node->setName(uniqueName + "_" + nodeName);
+        if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
+                           nodeName.find("ready") == std::string::npos)) {
+          node->setBlackboxOutput(true);
+        }
       } else if (nodeName.find("lhs") != std::string::npos) {
         assignSignals(inputNodes[0], node, nodeName);
       } else if (nodeName.find("rhs") != std::string::npos) {
@@ -309,19 +424,25 @@ public:
   void connectInputNodes() override {
     for (unsigned int i = 0; i < inputNodes.size(); i++) {
       auto &currentInputNodes = inputNodes[i];
-      auto *moduleBeforeOperation = inputModules[i];
-      auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+      auto *moduleBeforeSubjectGraph = inputSubjectGraphs[i];
       ChannelSignals &moduleBeforeOutputNodes =
           moduleBeforeSubjectGraph->returnOutputNodes(
-              inputModuleToResNum[moduleBeforeOperation]);
+              inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
       connectSignals(moduleBeforeOutputNodes.readySignal,
                      currentInputNodes.readySignal);
       connectSignals(currentInputNodes.validSignal,
                      moduleBeforeOutputNodes.validSignal);
 
-      if (dataWidth > 4)
+      if (isBlackbox) {
+        // the input to the blackbox should stay as an output signal
+        for (auto *node : currentInputNodes.dataSignals) {
+          node->setInput(false);
+          node->setOutput(false);
+        }
         continue;
+      }
+
       for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
         connectSignals(currentInputNodes.dataSignals[j],
                        moduleBeforeOutputNodes.dataSignals[j]);
@@ -451,11 +572,10 @@ public:
       // start node
       return;
     }
-    auto *moduleBeforeOperation = inputModules[0];
-    auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
     ChannelSignals &moduleBeforeOutputNodes =
         moduleBeforeSubjectGraph->returnOutputNodes(
-            inputModuleToResNum[moduleBeforeOperation]);
+            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
     connectSignals(moduleBeforeOutputNodes.readySignal,
                    currentInputNodes.readySignal);
@@ -531,13 +651,12 @@ public:
   }
 
   void connectInputNodes() override {
-    for (unsigned int i = 1; i < inputNodes.size(); i++) {
+    for (unsigned int i = 0; i < inputNodes.size(); i++) {
       auto &currentInputNodes = inputNodes[i];
-      auto *moduleBeforeOperation = inputModules[i];
-      auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+      auto *moduleBeforeSubjectGraph = inputSubjectGraphs[i + 1];
       ChannelSignals &moduleBeforeOutputNodes =
           moduleBeforeSubjectGraph->returnOutputNodes(
-              inputModuleToResNum[moduleBeforeOperation]);
+              inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
       connectSignals(moduleBeforeOutputNodes.readySignal,
                      currentInputNodes.readySignal);
@@ -552,14 +671,13 @@ public:
 
     // index is the first input
     auto &currentIndexNodes = indexNodes;
-    auto *moduleBeforeOperation = inputModules.front();
-    auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+    auto *moduleBeforeSubjectGraph = inputSubjectGraphs.front();
     ChannelSignals &moduleBeforeOutputNodes =
         moduleBeforeSubjectGraph->returnOutputNodes(
-            inputModuleToResNum[moduleBeforeOperation]);
+            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
-    connectSignals(currentIndexNodes.readySignal,
-                   moduleBeforeOutputNodes.readySignal);
+    connectSignals(moduleBeforeOutputNodes.readySignal,
+                   currentIndexNodes.readySignal);
     connectSignals(currentIndexNodes.validSignal,
                    moduleBeforeOutputNodes.validSignal);
 
@@ -648,11 +766,10 @@ public:
   void connectInputNodes() override {
     for (unsigned int i = 0; i < inputNodes.size(); i++) {
       auto &currentInputNodes = inputNodes[i];
-      auto *moduleBeforeOperation = inputModules[i];
-      auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+      auto *moduleBeforeSubjectGraph = inputSubjectGraphs[i];
       ChannelSignals &moduleBeforeOutputNodes =
           moduleBeforeSubjectGraph->returnOutputNodes(
-              inputModuleToResNum[moduleBeforeOperation]);
+              inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
       connectSignals(moduleBeforeOutputNodes.readySignal,
                      currentInputNodes.readySignal);
@@ -725,11 +842,10 @@ public:
   void connectInputNodes() override {
     {
       auto &currentInputNodes = conditionNodes;
-      auto *moduleBeforeOperation = inputModules[0];
-      auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+      auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
       ChannelSignals &moduleBeforeOutputNodes =
           moduleBeforeSubjectGraph->returnOutputNodes(
-              inputModuleToResNum[moduleBeforeOperation]);
+              inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
       connectSignals(moduleBeforeOutputNodes.readySignal,
                      currentInputNodes.readySignal);
@@ -743,11 +859,10 @@ public:
     }
     {
       auto &currentInputNodes = inputNodes;
-      auto *moduleBeforeOperation = inputModules[1];
-      auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+      auto *moduleBeforeSubjectGraph = inputSubjectGraphs[1];
       ChannelSignals &moduleBeforeOutputNodes =
           moduleBeforeSubjectGraph->returnOutputNodes(
-              inputModuleToResNum[moduleBeforeOperation]);
+              inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
       connectSignals(moduleBeforeOutputNodes.readySignal,
                      currentInputNodes.readySignal);
       connectSignals(currentInputNodes.validSignal,
@@ -856,11 +971,10 @@ public:
 
   void connectInputNodes() override {
     auto &currentInputNodes = addrInSignals;
-    auto *moduleBeforeOperation = inputModules[0];
-    auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
     ChannelSignals &moduleBeforeOutputNodes =
         moduleBeforeSubjectGraph->returnOutputNodes(
-            inputModuleToResNum[moduleBeforeOperation]);
+            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
     connectSignals(moduleBeforeOutputNodes.readySignal,
                    currentInputNodes.readySignal);
@@ -926,11 +1040,10 @@ public:
 
   void connectInputNodes() override {
     auto &currentInputNodes = addrInSignals;
-    auto *moduleBeforeOperation = inputModules[0];
-    auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
     ChannelSignals &moduleBeforeOutputNodes =
         moduleBeforeSubjectGraph->returnOutputNodes(
-            inputModuleToResNum[moduleBeforeOperation]);
+            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
     connectSignals(moduleBeforeOutputNodes.readySignal,
                    currentInputNodes.readySignal);
@@ -943,11 +1056,10 @@ public:
     }
 
     auto &currentInputNodes2 = dataInSignals;
-    auto *moduleBeforeOperation2 = inputModules[1];
-    auto *moduleBeforeSubjectGraph2 = moduleMap[moduleBeforeOperation2];
+    auto *moduleBeforeSubjectGraph2 = inputSubjectGraphs[1];
     ChannelSignals &moduleBeforeOutputNodes2 =
         moduleBeforeSubjectGraph2->returnOutputNodes(
-            inputModuleToResNum[moduleBeforeOperation2]);
+            inputSubjectGraphToResNum[moduleBeforeSubjectGraph2]);
 
     connectSignals(moduleBeforeOutputNodes2.readySignal,
                    currentInputNodes2.readySignal);
@@ -1014,11 +1126,10 @@ public:
 
   void connectInputNodes() override {
     auto &currentControlSignals = controlSignals;
-    auto *moduleBeforeOperation = inputModules[0];
-    auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
     ChannelSignals &moduleBeforeOutputNodes =
         moduleBeforeSubjectGraph->returnOutputNodes(
-            inputModuleToResNum[moduleBeforeOperation]);
+            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
     connectSignals(moduleBeforeOutputNodes.readySignal,
                    currentControlSignals.readySignal);
@@ -1083,12 +1194,10 @@ public:
 
   void connectInputNodes() override {
     auto &currentInputNodes = inputSignals;
-    auto *moduleBeforeOperation = inputModules[0];
-    auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
     ChannelSignals &moduleBeforeOutputNodes =
         moduleBeforeSubjectGraph->returnOutputNodes(
-            inputModuleToResNum[moduleBeforeOperation]);
-
+            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
     connectSignals(moduleBeforeOutputNodes.readySignal,
                    currentInputNodes.readySignal);
@@ -1106,6 +1215,77 @@ public:
   };
 };
 
+class SelectSubjectGraph : public BaseSubjectGraph {
+private:
+  unsigned int dataWidth = 0;
+  std::unordered_map<unsigned int, ChannelSignals> inputSignals;
+  ChannelSignals outputSignals;
+
+public:
+  SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
+    llvm::TypeSwitch<Operation *, void>(op)
+        .Case<handshake::SelectOp>([&](auto selectOp) {
+          dataWidth = handshake::getHandshakeTypeBitWidth(
+              selectOp->getOperand(1).getType());
+          appendVarsToPath({dataWidth});
+        })
+        .Default([&](auto) {
+          assert(false && "Operation does not match any supported type");
+          return;
+        });
+
+    experimental::BlifParser parser;
+    blifData = parser.parseBlifFile(fullPath);
+
+    for (auto &node : blifData->getAllNodes()) {
+      auto nodeName = node->getName();
+      if (nodeName.find("trueValue") != std::string::npos &&
+          (node->isInput() || node->isOutput())) {
+        assignSignals(inputSignals[1], node, nodeName);
+      } else if (nodeName.find("falseValue") != std::string::npos &&
+                 (node->isInput() || node->isOutput())) {
+        assignSignals(inputSignals[2], node, nodeName);
+      } else if (nodeName.find("condition") != std::string::npos &&
+                 (node->isInput() || node->isOutput())) {
+        assignSignals(inputSignals[0], node, nodeName);
+      } else if (nodeName.find("result") != std::string::npos) {
+        assignSignals(outputSignals, node, nodeName);
+        node->setName(uniqueName + "_" + nodeName);
+      } else if (nodeName.find(".") != std::string::npos) {
+        node->setName(uniqueName + "." + nodeName);
+      }
+    }
+
+    blifData->generateBlifFile(
+        "/home/oyasar/full_integration/dynamatic_generated/" + uniqueName +
+        ".blif");
+  };
+
+  void connectInputNodes() override {
+    for (unsigned int i = 0; i < inputSignals.size(); i++) {
+      auto &currentInputNodes = inputSignals[i];
+      auto *moduleBeforeSubjectGraph = inputSubjectGraphs[i];
+      ChannelSignals &moduleBeforeOutputNodes =
+          moduleBeforeSubjectGraph->returnOutputNodes(
+              inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
+
+      connectSignals(moduleBeforeOutputNodes.readySignal,
+                     currentInputNodes.readySignal);
+      connectSignals(currentInputNodes.validSignal,
+                     moduleBeforeOutputNodes.validSignal);
+
+      for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
+        connectSignals(currentInputNodes.dataSignals[j],
+                       moduleBeforeOutputNodes.dataSignals[j]);
+      }
+    }
+  }
+
+  ChannelSignals &returnOutputNodes(unsigned int channelIndex) override {
+    return outputSignals;
+  };
+};
+
 class BranchSinkSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
@@ -1115,17 +1295,16 @@ private:
 public:
   BranchSinkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
     llvm::TypeSwitch<Operation *, void>(op)
-        .Case<handshake::BranchOp, handshake::SinkOp>(
-            [&](auto) {
-              dataWidth = handshake::getHandshakeTypeBitWidth(
-                  op->getOperand(0).getType());
-              if (dataWidth == 0) {
-                moduleType += "_dataless";
-                appendVarsToPath({});
-              } else {
-                appendVarsToPath({dataWidth});
-              }
-            })
+        .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
+          dataWidth =
+              handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
+          if (dataWidth == 0) {
+            moduleType += "_dataless";
+            appendVarsToPath({});
+          } else {
+            appendVarsToPath({dataWidth});
+          }
+        })
         .Default([&](auto) {
           assert(false && "Operation does not match any supported type");
           return;
@@ -1154,15 +1333,16 @@ public:
   }
 
   void connectInputNodes() override {
-    // if (llvm::isa<handshake::SinkOp>(op)) {
-    //   return;
-    // }
+    if (inputModules.empty()) {
+      // start node
+      return;
+    }
     auto &currentInputNodes = inputSignals;
-    auto *moduleBeforeOperation = inputModules[0];
-    auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+
+    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
     ChannelSignals &moduleBeforeOutputNodes =
         moduleBeforeSubjectGraph->returnOutputNodes(
-            inputModuleToResNum[moduleBeforeOperation]);
+            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
     connectSignals(moduleBeforeOutputNodes.readySignal,
                    currentInputNodes.readySignal);
@@ -1240,16 +1420,118 @@ public:
         ".blif");
   }
 
+  BufferSubjectGraph(Operation *op1, Operation *op2, std::string &bufferType)
+      : BaseSubjectGraph() {
+    subjectGraphMap[this] = nullptr;
+    moduleType = bufferType;
+
+    BaseSubjectGraph *graph1 = moduleMap[op1];
+    BaseSubjectGraph *graph2 = moduleMap[op2];
+    inputSubjectGraphs.push_back(graph1);
+    outputSubjectGraphs.push_back(graph2);
+
+    static unsigned int bufferCount;
+    // find the channel number and datawidth of the channel
+    unsigned int channelNum = getChannelNumber(graph1, graph2);
+    outputSubjectGraphToResNum[graph2] = channelNum;
+    inputSubjectGraphToResNum[graph1] = channelNum;
+    // get the channel width
+    ChannelSignals &channel = graph1->returnOutputNodes(channelNum);
+    dataWidth = channel.dataSignals.size();
+    // set the unique name
+    uniqueName = "oehb_" + std::to_string(bufferCount++);
+
+    changeOutput(graph1, this, graph2);
+    changeInput(graph2, this, graph1);
+
+    if (dataWidth == 0) {
+      moduleType += "_dataless";
+      appendVarsToPath({});
+    } else {
+      appendVarsToPath({dataWidth});
+    }
+
+    experimental::BlifParser parser;
+    blifData = parser.parseBlifFile(fullPath);
+
+    for (auto &node : blifData->getAllNodes()) {
+      auto nodeName = node->getName();
+      if (nodeName.find("ins") != std::string::npos &&
+          (node->isInput() || node->isOutput())) {
+        assignSignals(inputSignals, node, nodeName);
+      } else if (nodeName.find("outs") != std::string::npos) {
+        assignSignals(outputSignals, node, nodeName);
+        node->setName(uniqueName + "_" + nodeName);
+      } else if (nodeName.find(".") != std::string::npos ||
+                 nodeName.find("dataReg") != std::string::npos) {
+        node->setName(uniqueName + "." + nodeName);
+      }
+    }
+
+    blifData->generateBlifFile(
+        "/home/oyasar/full_integration/dynamatic_generated/" + uniqueName +
+        ".blif");
+  }
+
+  BufferSubjectGraph(BufferSubjectGraph *graph1, Operation *op2,
+                     std::string &bufferType)
+      : BaseSubjectGraph() {
+    subjectGraphMap[this] = nullptr;
+    moduleType = bufferType;
+
+    BaseSubjectGraph *graph2 = moduleMap[op2];
+    inputSubjectGraphs.push_back(graph1);
+    outputSubjectGraphs.push_back(graph2);
+
+    static unsigned int bufferCount;
+    // find the channel number and datawidth of the channel
+    unsigned int channelNum = getChannelNumber(graph1, graph2);
+    outputSubjectGraphToResNum[graph2] = channelNum;
+    inputSubjectGraphToResNum[graph1] = channelNum;
+    // get the channel width
+    ChannelSignals &channel = graph1->returnOutputNodes(channelNum);
+    dataWidth = channel.dataSignals.size();
+    // set the unique name
+    uniqueName = "tehb_" + std::to_string(bufferCount++);
+
+    changeOutput(graph1, this, graph2);
+    changeInput(graph2, this, graph1);
+
+    if (dataWidth == 0) {
+      moduleType += "_dataless";
+      appendVarsToPath({});
+    } else {
+      appendVarsToPath({dataWidth});
+    }
+
+    experimental::BlifParser parser;
+    blifData = parser.parseBlifFile(fullPath);
+
+    for (auto &node : blifData->getAllNodes()) {
+      auto nodeName = node->getName();
+      if (nodeName.find("ins") != std::string::npos &&
+          (node->isInput() || node->isOutput())) {
+        assignSignals(inputSignals, node, nodeName);
+      } else if (nodeName.find("outs") != std::string::npos) {
+        assignSignals(outputSignals, node, nodeName);
+        node->setName(uniqueName + "_" + nodeName);
+      } else if (nodeName.find(".") != std::string::npos ||
+                 nodeName.find("dataReg") != std::string::npos) {
+        node->setName(uniqueName + "." + nodeName);
+      }
+    }
+
+    blifData->generateBlifFile(
+        "/home/oyasar/full_integration/dynamatic_generated/" + uniqueName +
+        ".blif");
+  }
+
   void connectInputNodes() override {
-    // if (llvm::isa<handshake::SinkOp>(op)) {
-    //   return;
-    // }
     auto &currentInputNodes = inputSignals;
-    auto *moduleBeforeOperation = inputModules[0];
-    auto *moduleBeforeSubjectGraph = moduleMap[moduleBeforeOperation];
+    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
     ChannelSignals &moduleBeforeOutputNodes =
         moduleBeforeSubjectGraph->returnOutputNodes(
-            inputModuleToResNum[moduleBeforeOperation]);
+            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
     connectSignals(moduleBeforeOutputNodes.readySignal,
                    currentInputNodes.readySignal);
@@ -1298,8 +1580,6 @@ public:
               moduleMap[op] = new ConditionalBranchSubjectGraph(op);
             })
         .Case<handshake::SourceOp>([&](auto) {
-          // No discrimianting parameters, just to avoid falling into
-          // the default case for sources
           moduleMap[op] = new SourceSubjectGraph(op);
         })
         .Case<handshake::LoadOpInterface>(
@@ -1331,10 +1611,9 @@ public:
               handshake::DivSIOp, handshake::DivUIOp>(
             [&](auto) { moduleMap[op] = new ArithSubjectGraph(op); })
         .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
-          // moduleMap[op] = SelectSubjectGraph(op);
+          moduleMap[op] = new SelectSubjectGraph(op);
         })
         .Case<handshake::CmpIOp>([&](handshake::CmpIOp cmpIOp) {
-          // Predicate and bitwidth
           moduleMap[op] = {moduleMap[op] = new CmpISubjectGraph(op)};
         })
         .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::ExtFOp,
@@ -1347,19 +1626,20 @@ public:
           return;
         });
   }
+};
 
-  // void connectSubjectGraphs() {
-  //   for (auto &module : moduleMap) {
-  //     for (auto &input : module.second->inputs) {
-  //       if (auto *definingOp = input.getDefiningOp()) {
-  //         if (auto *definingOpSubjectGraph = moduleMap.lookup(definingOp)) {
-  //           definingOpSubjectGraph->outputs[op.first] =
-  //           input.getPortNumber();
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
+class SubjectGraphGenerator {
+public:
+  SubjectGraphGenerator(handshake::FuncOp funcOp) {
+    //create the subject graph for each operation
+    funcOp.walk(
+        [&](Operation *op) { (experimental::OperationDifferentiator(op)); });
+
+    //initialize the input and output modules of each subject graph
+    for (auto &module : experimental::OperationDifferentiator::moduleMap) {
+      module.second->replaceOpsBySubjectGraph();
+    }
+  }
 };
 } // namespace experimental
 } // namespace dynamatic

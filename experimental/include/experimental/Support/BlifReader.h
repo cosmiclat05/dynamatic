@@ -42,6 +42,7 @@ private:
   std::string name;
   //BlifData *parent;
   bool isChannelEdge = false;
+  bool isBlackboxOutput = false;
   bool isInputBool = false;
   bool isOutputBool = false;
   bool isLatchInputBool = false;
@@ -68,6 +69,7 @@ public:
     // Copy the primitive types and strings
     name = other.name;
     isChannelEdge = other.isChannelEdge;
+    isBlackboxOutput = other.isBlackboxOutput;
     isInputBool = other.isInputBool;
     isOutputBool = other.isOutputBool;
     isLatchInputBool = other.isLatchInputBool;
@@ -101,6 +103,7 @@ public:
   const std::string &getName() const { return name; }
   void setName(const std::string &newName);
   void setChannelEdge(bool value) { isChannelEdge = value; }
+  void setBlackboxOutput(bool value) { isBlackboxOutput = value; }
   void setInput(bool value) { isInputBool = value; }
   void setOutput(bool value) { isOutputBool = value; }
   void setLatchInput(bool value) { isLatchInputBool = value; }
@@ -112,7 +115,8 @@ public:
   bool isInput() const { return isInputBool; }
   bool isOutput() const { return isOutputBool; }
   bool isChannelEdgeNode() const { return isChannelEdge; }
-  bool isPrimaryInput() const { return (isConstOneBool || isConstZeroBool || isInputBool || isLatchOutputBool) ; }
+  bool isBlackboxOutputNode() const { return isBlackboxOutput; }
+  bool isPrimaryInput() const { return (isConstOneBool || isConstZeroBool || isInputBool || isLatchOutputBool || isBlackboxOutput) ; }
   bool isPrimaryOutput() const { return (isOutputBool || isLatchInputBool); }
   bool isLatchInput() const { return isLatchInputBool; }
   bool isLatchOutput() const { return isLatchOutputBool; }
@@ -134,7 +138,7 @@ public:
   bool operator<(const Node &other) const { return name < other.name; }
   bool operator<(const Node *other) const { return name < other->name; }
   bool operator>(const Node &other) const { return name > other.name; }
-  std::string str() { return name; }
+  std::string str() const { return name; }
 
   friend class BlifData;
 };
@@ -184,19 +188,10 @@ public:
     }
   }
 
-  bool isChannelRSTVar(Node* node) {
-  // a hacky way to determine if a variable is a channel variable.
-  // if it includes "new", "." and does not include "_", it is not a channel
-  // variable
-  return ((node->getName().find("new") == std::string::npos &&
-         node->getName().find('.') == std::string::npos &&
-         node->getName().find('_') != std::string::npos) || node->getName().find("rst") != std::string::npos);
-  }
-
   Node* addNode(Node* node) {
     static unsigned int counter = 0;
     if (nodes.find(node->getName()) != nodes.end()) {
-      if (isChannelRSTVar(node)){
+      if (node->isChannelEdgeNode()){
         return nodes[node->getName()];
       }
       node->setName(node->getName() + "_" + std::to_string(counter++));
@@ -219,6 +214,16 @@ public:
     std::set<Node *> result;
     for (const auto &pair : nodes) {
       if (pair.second->isPrimaryOutput()) {
+        result.insert(pair.second);
+      }
+    }
+    return result;
+  }
+
+  std::set<Node*> getChannels() {
+    std::set<Node*> result;
+    for (const auto &pair : nodes) {
+      if (pair.second->isChannelEdgeNode()) {
         result.insert(pair.second);
       }
     }
