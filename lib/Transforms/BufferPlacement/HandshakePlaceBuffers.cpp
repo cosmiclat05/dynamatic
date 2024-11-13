@@ -491,22 +491,11 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-void processBackedges(handshake::FuncOp funcOp,
-                      std::function<void(Value&, Operation*)> helper) {
-  // Find all loopbacks in the function and process them using the provided
-  // function. Helper function takes 2 inputs, one for the channel and one for the output operation
-  funcOp.walk([&](mlir::Operation *op) {
-    for (Value result : op->getResults()) {
-      for (Operation *user : result.getUsers()) {
-        if (isBackedge(result, user)) {
-          helper(result, user);
-        }
-      }
-    }
-  });
-}
-
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
+  // The only strategy at this point is to place buffers on the output channels
+  // of all merge-like operations. We still want to respect channel-specific
+  // buffering constraints
+
   // Read the operations' timing models from disk
   TimingDatabase timingDB(&getContext());
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
@@ -515,49 +504,31 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
     // Map all channels in the function to their specific buffering properties,
     // adjusting for internal buffers present inside the units
-
     llvm::MapVector<Value, ChannelBufProps> channelProps;
     if (failed(mapChannelsToProperties(funcOp, timingDB, channelProps)))
       return failure();
 
-    auto adjustBufferingConstraints = [&](Value &channel, Operation *op = nullptr) {
-      ChannelBufProps &resProps = channelProps[channel];
+    // Make sure that the data output channels of all merge-like operations have
+    // at least one opaque and one transparent slot, unless a constraint
+    // explicitly prevents us from putting a buffer there
+    for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
+      ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
       if (resProps.maxTrans.value_or(1) >= 1) {
         resProps.minTrans = std::max(resProps.minTrans, 1U);
       } else {
-        channel.getDefiningOp()->emitWarning()
-            << "Cannot place transparent buffer on operation's "
-               "output due to channel-specific buffering constraints. This "
-               "may yield an invalid buffering.";
+        mergeLikeOp->emitWarning()
+            << "Cannot place transparent buffer on merge-like operation's "
+               "output due to channel-specific buffering constraints. This may "
+               "yield an invalid buffering.";
       }
       if (resProps.maxOpaque.value_or(1) >= 1) {
         resProps.minOpaque = std::max(resProps.minOpaque, 1U);
       } else {
-        channel.getDefiningOp()->emitWarning()
-            << "Cannot place opaque buffer on operation's "
-               "output due to channel-specific buffering constraints. This "
-               "may yield an invalid buffering.";
+        mergeLikeOp->emitWarning()
+            << "Cannot place opaque buffer on merge-like operation's "
+               "output due to channel-specific buffering constraints. This may "
+               "yield an invalid buffering.";
       }
-    };
-
-    if (algorithm == ON_MERGES) {
-      // The only strategy at this point is to place buffers on the output
-      // channels of all merge-like operations. We still want to respect
-      // channel-specific buffering constraints, so we make sure that each
-      // output channel has at
-
-      // Make sure that the data output channels of all merge-like operations
-      // have at least one opaque and one transparent slot, unless a constraint
-      // explicitly prevents us from putting a buffer there
-      for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
-        Value result = mergeLikeOp->getResult(0);
-        adjustBufferingConstraints(result);
-      }
-    }
-
-    if (algorithm == CUT_LOOPBACKS) {
-      // Make sure that all the loops are cut by placing at least one buffer
-      processBackedges(funcOp, adjustBufferingConstraints);
     }
 
     // Place the minimal number of buffers (as specified by the buffering
@@ -571,8 +542,10 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     }
     instantiateBuffers(placement);
   }
+
   return success();
 }
+
 
 void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
   MLIRContext *ctx = &getContext();

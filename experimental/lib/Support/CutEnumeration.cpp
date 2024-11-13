@@ -24,400 +24,9 @@
 
 using namespace dynamatic::experimental;
 
-void Cuts::readFromFile(const std::string &filename) {
-  std::ifstream file(filename);
-  if (!file.is_open()) {
-    llvm::errs() << "Unable to open file: " + filename;
-  }
 
-  std::string line;
-  std::string nodeName;
-  std::string leaf;
-  int numberOfCuts = 0;
-  int cutSize = 0;
-
-  while (std::getline(file, line)) {
-    if (line.empty())
-      continue;
-    if (line[0] != '\t') {
-      std::istringstream iss(line);
-      iss >> nodeName >> numberOfCuts;
-      for (int i = 0; i < numberOfCuts; i++) {
-        std::getline(file, line);
-        if (line.substr(0, 5) == "Cut #") {
-          Node *node = blif->getNodeByName(nodeName);
-          Cut newCut(node);
-          std::istringstream iss(line);
-          std::string dummy;
-          iss >> dummy >> dummy >> cutSize;
-          for (int j = 0; j < cutSize; ++j) {
-            std::getline(file, line);
-            leaf = line.substr(1); // Remove leading tab
-            newCut.addLeaf(blif->getNodeByName(leaf));
-          }
-          addCut(node, newCut);
-        } else {
-          llvm::errs() << "No cut found!\n";
-          llvm::errs() << line << "\n";
-        }
-      }
-    } else {
-      llvm::errs() << "Tab found!\n";
-      llvm::errs() << line << "\n";
-    }
-  }
-}
-
-template <typename T>
-bool isSubset(const std::set<T> &setA, const std::set<T> &setB) {
-  if (setA.size() > setB.size()) {
-    return false; // A cannot be a subset if it's larger than B
-  }
-
-  for (const T &element : setA) {
-    if (setB.find(element) == setB.end()) {
-      return false; // Element from A not found in B
-    }
-  }
-
-  return true; // All elements of A were found in B
-}
-
-std::vector<Cut>
-Cuts::enumerateCuts(Node *node, const std::vector<std::vector<Cut>> &faninCuts,
-                    int lutSize) {
-
-  std::list<Cut> cutsList;
-  std::vector<Cut> cuts1 = faninCuts[0];
-  std::vector<Cut> cuts2 = faninCuts[1];
-
-  int depth = 0;
-  int maxDepth = 0;
-
-  for (auto &cut1 : cuts1) {
-    std::list<Cut> localCuts;
-    for (auto &cut2 : cuts2) {
-      std::set<Node *> leaves1 = cut1.getLeaves();
-      std::set<Node *> leaves2 = cut2.getLeaves();
-      // get max depth of cut1 and cut2
-      depth = std::max(cut1.getDepth(), cut2.getDepth());
-      if (depth > maxDepth) {
-        maxDepth = depth;
-      }
-      std::set<Node *> merge = leaves1;
-      merge.insert(leaves2.begin(), leaves2.end());
-      Cut mergedCut(node, merge, depth);
-      if (mergedCut.getLeaves().size() <= lutSize + maxExpansion) {
-        localCuts.push_back(mergedCut);
-      }
-    }
-    { cutsList.splice(cutsList.end(), localCuts); }
-  }
-
-  std::vector<Cut> cuts(cutsList.begin(), cutsList.end());
-
-  std::vector<Cut> cutsPruned;
-  for (auto &cut : cuts) {
-    bool isSubsetOfAnother = false;
-    for (auto &otherCut : cuts) {
-      if (cut.getLeaves() == otherCut.getLeaves()) {
-        continue;
-      }
-      if (isSubset(cut.getLeaves(), otherCut.getLeaves())) {
-        isSubsetOfAnother = true;
-        break;
-      }
-    }
-    if (!isSubsetOfAnother) {
-      cutsPruned.push_back(cut);
-    }
-  }
-
-  std::sort(cutsPruned.begin(), cutsPruned.end(), [](Cut &a, Cut &b) {
-    if (a.getDepth() == b.getDepth()) {
-      return a.getLeaves().size() > b.getLeaves().size();
-    }
-    return a.getDepth() > b.getDepth();
-  });
-
-  std::vector<Cut> cutsExceedingLutSize;
-  for (auto &cut : cutsPruned) {
-    if (cut.getLeaves().size() > lutSize) {
-      cutsExceedingLutSize.push_back(cut);
-    }
-  }
-
-  std::vector<Cut> cutsWithLimitedLeaves;
-  for (auto &cut : cutsPruned) {
-    if (cut.getLeaves().size() <= lutSize) {
-      cutsWithLimitedLeaves.push_back(cut);
-    }
-  }
-
-  std::vector<Cut> cutsMerged;
-  // Keep only the first 20 biggest cuts
-  for (size_t i = 0; i < cutsWithLimitedLeaves.size() && i < 30; ++i) {
-    cutsMerged.push_back(cutsWithLimitedLeaves[i]);
-  }
-
-  for (size_t i = 0; i < cutsExceedingLutSize.size() && i < 10; ++i) {
-    cutsMerged.push_back(cutsExceedingLutSize[i]);
-  }
-
-  cutsMerged.erase(std::unique(cutsMerged.begin(), cutsMerged.end(),
-                               [](Cut &a, Cut &b) {
-                                 return a.getLeaves() == b.getLeaves();
-                               }),
-                   cutsMerged.end());
-
-  // Add trivial cut
-  cutsMerged.emplace_back(node, node, maxDepth + 1);
-
-  return cutsMerged;
-}
-
-std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-Cuts::cutless() {
-  int n = 0;
-  std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
-  std::set<Node *> nextWavyLine;
-  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-      cutlessCuts;
-
-  while (true) {
-    nextWavyLine = blif->findNodesWithLimitedWavyInputs(6, currentWavyLine);
-    if (nextWavyLine.size() == currentWavyLine.size()) {
-      break;
-    }
-
-    for (auto *node : nextWavyLine) {
-      cutlessCuts[node].emplace_back(
-          node, blif->findWavyInputsOfNode(node, currentWavyLine), n);
-    }
-
-    n++;
-    // currentWavyLine = nextWavyLine;
-    currentWavyLine.insert(nextWavyLine.begin(), nextWavyLine.end());
-    llvm::errs() << n << " " << currentWavyLine.size() << "\n";
-  }
-
-  for (auto &[node, cuts] : cutlessCuts) {
-    cuts.erase(std::unique(cuts.begin(), cuts.end(),
-                           [](Cut &a, Cut &b) {
-                             const auto &leavesA = a.getLeaves();
-                             const auto &leavesB = b.getLeaves();
-
-                             // Compare the sizes first as an optimization
-                             if (leavesA.size() != leavesB.size()) {
-                               return false;
-                             }
-
-                             // Compare elements in the set based on Node's name
-                             // strings
-                             return std::equal(
-                                 leavesA.begin(), leavesA.end(),
-                                 leavesB.begin(), leavesB.end(),
-                                 [](const Node *nodeA, const Node *nodeB) {
-                                   return nodeA->getName() == nodeB->getName();
-                                 });
-                           }),
-               cuts.end());
-  }
-
-  return cutlessCuts;
-}
-
-bool isChannelVarCut(const std::string &node) {
-  // a hacky way to determine if a variable is a channel variable.
-  // if it includes "new", "." and does not include "_", it is not a channel
-  // variable
-  return node.find("new") == std::string::npos &&
-         node.find('.') == std::string::npos &&
-         node.find('_') != std::string::npos;
-}
-
-std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-Cuts::cutlessChannels() {
-  int n = 0;
-  std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
-  for (auto *channel : blif->getChannels()) {
-    currentWavyLine.insert(channel);
-  }
-
-  std::set<Node *> nextWavyLine;
-  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-      cutlessCuts;
-
-  std::set<Node *> previousWavyLine;
-  while (true) {
-    nextWavyLine = blif->findNodesWithLimitedWavyInputs(6, currentWavyLine);
-
-    for (auto *node : nextWavyLine) {
-      cutlessCuts[node].emplace_back(
-          node, blif->findWavyInputsOfNode(node, currentWavyLine), n);
-    }
-
-    n++;
-    llvm::errs() << n << " " << currentWavyLine.size() << "\n";
-    previousWavyLine = currentWavyLine;
-    currentWavyLine.insert(nextWavyLine.begin(), nextWavyLine.end());
-
-    if (nextWavyLine.size() == currentWavyLine.size() || currentWavyLine.size() == previousWavyLine.size()) {
-      break;
-    }
-
-
-  }
-
-  for (auto &[node, cuts] : cutlessCuts) {
-    cuts.erase(std::unique(cuts.begin(), cuts.end(),
-                           [](Cut &a, Cut &b) {
-                             const auto &leavesA = a.getLeaves();
-                             const auto &leavesB = b.getLeaves();
-
-                             // Compare the sizes first as an optimization
-                             if (leavesA.size() != leavesB.size()) {
-                               return false;
-                             }
-
-                             // Compare elements in the set based on Node's name
-                             // strings
-                             return std::equal(
-                                 leavesA.begin(), leavesA.end(),
-                                 leavesB.begin(), leavesB.end(),
-                                 [](const Node *nodeA, const Node *nodeB) {
-                                   return nodeA->getName() == nodeB->getName();
-                                 });
-                           }),
-               cuts.end());
-  }
-
-  return cutlessCuts;
-}
-
-// Usage in your main cut enumeration function
-std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-Cuts::computeAllCuts() {
-  // cuts = cutless();
-  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-      cutResults;
-
-  for (auto *node : blif->getNodesInOrder()) {
-    if (node->isPrimaryInput()) {
-      cutResults[node].emplace_back(node, node, 0);
-      continue;
-    }
-
-    auto fanins = node->getFanins();
-
-    if (fanins.size() == 1) {
-      for (auto &cuts : cutResults[*fanins.begin()]) {
-        cutResults[node].emplace_back(node, cuts.getLeaves(), cuts.getDepth());
-      }
-      continue;
-    }
-
-    if (fanins.size() == 2) {
-      std::set<Node *> insOfFanin1 = (*fanins.begin())->getFanins();
-      std::set<Node *> insOfFanin2 =
-          (*std::next(fanins.begin(), 1))->getFanins();
-
-      if ((insOfFanin1 == insOfFanin2) && (!insOfFanin1.empty())) {
-        for (auto &cuts : cutResults[*fanins.begin()]) {
-          cutResults[node].emplace_back(node, cuts.getLeaves(),
-                                        cuts.getDepth());
-        }
-
-        int maxDepth = 0;
-        for (auto &cut : cutResults[*fanins.begin()]) {
-          if (cut.getDepth() > maxDepth) {
-            maxDepth = cut.getDepth();
-          }
-        }
-        cutResults[node].emplace_back(node, node, maxDepth + 1);
-        continue;
-      }
-    }
-
-    std::vector<std::vector<Cut>> faninCuts;
-    for (auto &fanin : fanins) {
-      faninCuts.push_back(cutResults[fanin]);
-    }
-
-    std::vector<Cut> cutsEnumerated = enumerateCuts(node, faninCuts, lutSize);
-    if (cutsEnumerated.size() == 1 && cutsEnumerated[0].getLeaves().empty()) {
-      continue;
-    }
-
-    cutResults[node].insert(cutResults[node].end(), cutsEnumerated.begin(),
-                            cutsEnumerated.end());
-  }
-
-  for (auto &[node, cuts] : cutResults) {
-
-    std::sort(cuts.begin(), cuts.end(), [](Cut &a, Cut &b) {
-      if (a.getDepth() == b.getDepth()) {
-        return a.getLeaves().size() < b.getLeaves().size();
-      }
-      return a.getDepth() < b.getDepth();
-    });
-
-    cuts.erase(std::remove_if(cuts.begin(), cuts.end(),
-                              [this](Cut &cut) {
-                                return cut.getLeaves().size() > lutSize;
-                              }),
-               cuts.end());
-
-    cuts.erase(std::unique(cuts.begin(), cuts.end(),
-                           [](Cut &a, Cut &b) {
-                             return a.getLeaves() == b.getLeaves();
-                           }),
-               cuts.end());
-  }
-
-  return cutResults;
-}
-
-void Cuts::runCutAlgos(bool computeAllCutsBool, bool cutlessBool,
-                       bool cutlessChannelsBool) {
-
-  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-      tempCuts;
-
-  if (computeAllCutsBool) {
-    auto cutsTemp1 = computeAllCuts();
-    for (auto &pair : cutsTemp1) {
-      Node *node = pair.first;
-      std::vector<Cut> &cutVector = pair.second;
-      tempCuts[node].insert(tempCuts[node].end(), cutVector.begin(),
-                            cutVector.end());
-    }
-  }
-  if (cutlessBool) {
-    auto cutsTemp1 = cutless();
-    for (auto &pair : cutsTemp1) {
-      Node *node = pair.first;
-      std::vector<Cut> &cutVector = pair.second;
-      tempCuts[node].insert(tempCuts[node].end(), cutVector.begin(),
-                            cutVector.end());
-    }
-  }
-  if (cutlessChannelsBool) {
-    auto cutsTemp1 = cutlessChannels();
-    for (auto &pair : cutsTemp1) {
-      Node *node = pair.first;
-      std::vector<Cut> &cutVector = pair.second;
-      tempCuts[node].insert(tempCuts[node].end(), cutVector.begin(),
-                            cutVector.end());
-    }
-  }
-
-  for (auto &pair : tempCuts) {
-    Node *node = pair.first;
-    std::vector<Cut> &cutVector = pair.second;
-    cuts[node].insert(cuts[node].end(), cutVector.begin(), cutVector.end());
-  }
-
+void sortAndEraseCuts(std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
+                                         NodePtrEqual> &cuts) {
   for (auto &[node, cutVector] : cuts) {
     std::sort(cutVector.begin(), cutVector.end(),
               [](const Cut &a, const Cut &b) {
@@ -500,6 +109,78 @@ void Cuts::runCutAlgos(bool computeAllCutsBool, bool cutlessBool,
   }
 }
 
+std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+Cuts::cutless(bool includeChannels) {
+  int n = 0;
+  std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
+  std::set<Node *> nextWavyLine;
+  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
+      cutlessCuts;
+
+  if (includeChannels) {
+    for (auto *channel : blif->getChannels()) {
+      currentWavyLine.insert(channel);
+    }
+  }
+
+  while (true) {
+    nextWavyLine =
+        blif->findNodesWithLimitedWavyInputs(lutSize, currentWavyLine);
+    if ((nextWavyLine.size() == currentWavyLine.size()) ||
+        (includeChannels && (n >= expansionWithChannels))) {
+      break;
+    }
+
+    for (auto *node : nextWavyLine) {
+      cutlessCuts[node].emplace_back(
+          node, blif->findWavyInputsOfNode(node, currentWavyLine), n);
+    }
+
+    n++;
+    llvm::errs() << n << " " << currentWavyLine.size() << "\n";
+    currentWavyLine.insert(nextWavyLine.begin(), nextWavyLine.end());
+  }
+
+  for (auto &[node, cuts] : cutlessCuts) {
+    cuts.erase(std::unique(cuts.begin(), cuts.end(),
+                           [](Cut &a, Cut &b) {
+                             const auto &leavesA = a.getLeaves();
+                             const auto &leavesB = b.getLeaves();
+
+                             // Compare the sizes first as an optimization
+                             if (leavesA.size() != leavesB.size()) {
+                               return false;
+                             }
+
+                             // Compare elements in the set based on Node's name
+                             // strings
+                             return std::equal(
+                                 leavesA.begin(), leavesA.end(),
+                                 leavesB.begin(), leavesB.end(),
+                                 [](const Node *nodeA, const Node *nodeB) {
+                                   return nodeA->getName() == nodeB->getName();
+                                 });
+                           }),
+               cuts.end());
+  }
+
+  return cutlessCuts;
+}
+
+void Cuts::runCutAlgos() {
+  auto cutsWithoutChannels = cutless(false);
+  auto cutsWithChannels = cutless(true);
+
+  // Merge cuts
+  cuts = std::move(cutsWithoutChannels);
+  for (const auto &[node, cutVector] : cutsWithChannels) {
+    cuts[node].insert(cuts[node].end(), cutVector.begin(), cutVector.end());
+  }
+
+  sortAndEraseCuts(cuts);
+  //printCuts("cuts.txt");
+}
+
 void Cuts::printCuts(std::string filename) {
   std::ofstream outFile("../mapbuf/" + filename);
   if (!outFile.is_open()) {
@@ -521,12 +202,13 @@ void Cuts::printCuts(std::string filename) {
       outFile << "Cut #" << i << ": " << cutSize << " depth: " << cut.getDepth()
               << "\n";
 
-      for (auto leaf : leaves) {
+      for (auto *leaf : leaves) {
         outFile << '\t' << leaf->str() << "\n";
       }
     }
   }
   outFile.close();
 }
+
 
 // CutEnumeration end

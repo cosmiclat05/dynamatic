@@ -34,6 +34,11 @@ namespace dynamatic {
 namespace buffer {
 namespace mapbuf {
 
+using pathMap = std::unordered_map<
+    std::pair<experimental::Node *, experimental::Node *>,
+    std::vector<experimental::Node *>,
+    boost::hash<std::pair<experimental::Node *, experimental::Node *>>>;
+
 /// Holds the state and logic for MAPBUF smart buffer placement. To buffer a
 /// dataflow circuit, this MILP-based algorithm creates:
 /// 1. custom channel constraints derived from channel-specific buffering
@@ -75,8 +80,10 @@ protected:
 
 private:
   StringRef blifFile;
+  experimental::BlifData *blifData;
   float lutDelay = 0.55;
   int bigConstant = 100;
+  pathMap leafToRootPaths;
 
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
@@ -88,17 +95,19 @@ private:
 
   void addBlackboxConstraints();
 
-  void addClockPeriodConstraintsNodes(experimental::BlifData &blif);
+  void addClockPeriodConstraintsNodes();
 
   void instantiateCutLoopbackBuffers(BufferPlacement &placement);
 
   void addClockPeriodConstraintsChannels(Value channel, SignalType signal);
 
-  void retrieveFPGA20Constraints(GRBModel &model);
-
   void findMinimumFeedbackArcSet();
 
-  static void placeBuffersHelper(Value &channel, Operation *outputOp);
+  void connectSubjectGraph();
+
+  void addCutSelectionConflicts(experimental::Node *key,
+                                experimental::Node *leaf,
+                                GRBVar &cutSelectionVar);
 
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior

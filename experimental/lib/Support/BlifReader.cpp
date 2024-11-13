@@ -79,8 +79,8 @@ void BlifData::traverseNodes() {
   }
 }
 
-BlifData* BlifParser::parseBlifFile(const std::string &filename) {
-  BlifData* data = new BlifData();
+BlifData *BlifParser::parseBlifFile(const std::string &filename) {
+  BlifData *data = new BlifData();
   std::ifstream file(filename);
   if (!file.is_open()) {
     llvm::errs() << "Unable to open file: " << filename << "\n";
@@ -202,19 +202,6 @@ BlifData* BlifParser::parseBlifFile(const std::string &filename) {
     }
   }
 
-  // for (auto &node : data->getAllNodes()) {
-  //   auto fanins = node->getFanins();
-  //   if (fanins.empty() && !node->isPrimaryInput()) { //
-  //     llvm::errs() << "Node " << node->str() << " no fanin!\n";
-  //     node->setInput(true);
-  //   }
-  //   auto fanouts = node->getFanouts();
-  //   if (fanouts.empty() && !node->isPrimaryOutput()) {
-  //     llvm::errs() << "Node " << node->str() << " no fanout!\n";
-  //     node->setOutput(true);
-  //   }
-  // }
-  
   data->traverseNodes();
   return data;
 }
@@ -269,39 +256,6 @@ void BlifData::generateBlifFile(const std::string &filename) {
   file.close();
 }
 
-// std::vector<std::string> BlifData::findPath(const std::string &start,
-//                                             const std::string &end) {
-//   std::vector<std::string> path;
-//   std::set<std::string> visited;
-//   std::unordered_map<std::string, std::set<std::string>> fanouts =
-//       m_nodeFanouts;
-
-//   std::function<bool(const std::string &, const std::string &)> dfs =
-//       [&](const std::string &node, const std::string &end) {
-//         if (node == end) {
-//           path.push_back(node);
-//           return true;
-//         }
-
-//         visited.insert(node);
-//         path.push_back(node);
-
-//         for (const auto &fanout : m_nodeFanouts[node]) {
-//           if (visited.count(fanout) == 0) {
-//             if (dfs(fanout, end)) {
-//               return true;
-//             }
-//           }
-//         }
-
-//         path.pop_back();
-//         return false;
-//       };
-
-//   dfs(start, end);
-//   return path;
-// }
-
 std::vector<Node *> BlifData::findPath(Node *start, Node *end) {
   std::queue<Node *> queue;
   std::unordered_map<Node *, Node *, boost::hash<Node *>> parent;
@@ -346,13 +300,12 @@ BlifData::findNodesWithLimitedWavyInputs(size_t limit,
 
   for (auto &node : nodesTopologicalOrder) {
     bool erased = false;
-    if (node->isChannelEdge){
+    if (node->isChannelEdge) {
       if (wavyLine.count(node) > 0) {
         wavyLine.erase(node);
         erased = true;
       }
     }
-        // llvm::errs() << "Node: " << node->str() << " Wavy Inputs: ";
     std::set<Node *> wavyInputs = findWavyInputsOfNode(node, wavyLine);
     if (wavyInputs.size() <= limit) {
       nodesWithLimitedPrimaryInputs.insert(node);
@@ -376,13 +329,11 @@ std::set<Node *> BlifData::findWavyInputsOfNode(Node *node,
     visited.insert(currentNode);
 
     if (wavyLine.count(currentNode) > 0) {
-      // llvm::errs() << "Wavy Input: " << currentNode->str() << "\n";
       primaryInputs.insert(currentNode);
       return;
     }
 
     for (const auto &fanin : currentNode->getFanins()) {
-      // llvm::errs() << "Fanin: " << fanin->str() << "\n";
       dfs(fanin);
     }
   };

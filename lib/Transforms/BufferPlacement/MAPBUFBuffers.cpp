@@ -259,6 +259,10 @@ std::ostringstream retrieveChannelName(const std::string &node,
   return varNameStream;
 }
 
+bool isOperationType(Operation *op, std::string_view type) {
+  return getUniqueName(op).find(type) != std::string::npos;
+}
+
 const std::map<unsigned int, double> ADDER_DELAYS = {
     {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.6}, {16, 0.7}, {32, 1.0}};
 
@@ -272,10 +276,6 @@ double getDelay(const std::map<unsigned int, double> &delayTable,
     it = delayTable.upper_bound(bitwidth);
   }
   return it != delayTable.end() ? it->second : 0.0;
-}
-
-bool isOperationType(Operation *op, std::string_view type) {
-  return getUniqueName(op).find(type) != std::string::npos;
 }
 
 void MAPBUFBuffers::addBlackboxConstraints() {
@@ -333,8 +333,7 @@ void MAPBUFBuffers::addBlackboxConstraints() {
   model.update();
 }
 
-void MAPBUFBuffers::addClockPeriodConstraintsNodes(
-    experimental::BlifData &blif) {
+void MAPBUFBuffers::addClockPeriodConstraintsNodes() {
   // Add clock period constraints for subject graph edges. For subject graph
   // edges, there is no need for 2 variables like channels, one at the input and
   // one at the output. We only need one variable for each node.
@@ -347,7 +346,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes(
     return variableExists(model, channelName);
   };
 
-  for (auto *node : blif.getNodesInOrder()) {
+  for (auto *node : blifData->getNodesInOrder()) {
     experimental::MILPVarsSubjectGraph *vars = node->gurobiVars;
     GRBVar &nodeVarIn = vars->tIn;
     GRBVar &nodeVarOut = vars->tOut;
@@ -399,15 +398,10 @@ void MAPBUFBuffers::addClockPeriodConstraintsChannels(Value channel,
   model.addConstr(t2 - t1 + bigConstant * bufVarSignal >= 0, "buf_delay");
 }
 
-using pathMap = std::unordered_map<
-    std::pair<experimental::Node *, experimental::Node *>,
-    std::vector<experimental::Node *>,
-    boost::hash<std::pair<experimental::Node *, experimental::Node *>>>;
-
 std::vector<experimental::Node *>
 getOrCreateLeafToRootPath(experimental::Node *key, experimental::Node *leaf,
-                          pathMap leafToRootPaths,
-                          experimental::BlifData &blif) {
+                          pathMap &leafToRootPaths,
+                          experimental::BlifData *blif) {
   // Check if the path from leaf to root has already been computed, if not then
   // compute it, if so then return it. Returns the shortest path by running BFS.
   auto leafKeyPair = std::make_pair(leaf, key);
@@ -415,7 +409,7 @@ getOrCreateLeafToRootPath(experimental::Node *key, experimental::Node *leaf,
     return leafToRootPaths[leafKeyPair];
   }
 
-  auto path = blif.findPath(leaf, key);
+  auto path = blif->findPath(leaf, key);
   if (!path.empty()) {
     // remove the starting node and the root node, as we should be able to place
     // buffers on channels adjacent to these nodes
@@ -427,48 +421,37 @@ getOrCreateLeafToRootPath(experimental::Node *key, experimental::Node *leaf,
   return path;
 }
 
-void MAPBUFBuffers::placeBuffersHelper(Value &channel, Operation *outputOp) {
-  auto *inputOp = channel.getDefiningOp();
-  handshake::ChannelBufProps &resProps = channelProps[channel];
-  if (resProps.maxTrans.value_or(1) >= 1) {
-    GRBVar &bufVar =
-        vars.channelVars[channel].signalVars[SignalType::READY].bufPresent;
-    model.addConstr(bufVar == 1, "backedge_ready");
-  }
-  if (resProps.maxOpaque.value_or(1) >= 1) {
-    GRBVar &bufVar =
-        vars.channelVars[channel].signalVars[SignalType::DATA].bufPresent;
-    model.addConstr(bufVar == 1, "backedge_data");
-  }
-  std::string oehbStr = "oehb";
-  std::string tehbStr = "tehb";
-  experimental::BufferSubjectGraph *oehb =
-      new experimental::BufferSubjectGraph(inputOp, outputOp, oehbStr);
-  experimental::BufferSubjectGraph *tehb =
-      new experimental::BufferSubjectGraph(oehb, outputOp, tehbStr);
-}
-
-void processBackedges(handshake::FuncOp funcOp,
-                      std::function<void(Value &, Operation *)> helper) {
-  // Find all loopbacks in the function and process them using the provided
-  // function. Helper function takes 2 inputs, one for the channel and one for
-  // the output operation
-  funcOp.walk([&](mlir::Operation *op) {
-    for (Value result : op->getResults()) {
-      for (Operation *user : result.getUsers()) {
-        if (isBackedge(result, user)) {
-          helper(result, user);
-        }
-      }
-    }
-  });
-}
-
 void MAPBUFBuffers::addCutLoopbackBuffers() {
   // Add constraints to ensure that the loopback buffers are placed. Simply loop
   // over all the channels and check if the channel is a back edge.
   auto funcOp = funcInfo.funcOp;
-  processLoopbacks(funcOp, placeBuffersHelper);
+  funcOp.walk([&](mlir::Operation *op) {
+    for (Value result : op->getResults()) {
+      for (Operation *user : result.getUsers()) {
+        if (isBackedge(result, user)) {
+          handshake::ChannelBufProps &resProps = channelProps[result];
+          if (resProps.maxTrans.value_or(1) >= 1) {
+            GRBVar &bufVar = vars.channelVars[result]
+                                 .signalVars[SignalType::READY]
+                                 .bufPresent;
+            model.addConstr(bufVar == 1, "backedge_ready");
+          }
+          if (resProps.maxOpaque.value_or(1) >= 1) {
+            GRBVar &bufVar = vars.channelVars[result]
+                                 .signalVars[SignalType::DATA]
+                                 .bufPresent;
+            model.addConstr(bufVar == 1, "backedge_data");
+          }
+          std::string oehbStr = "oehb";
+          std::string tehbStr = "tehb";
+          experimental::BufferSubjectGraph *oehb =
+              new experimental::BufferSubjectGraph(op, user, oehbStr);
+          experimental::BufferSubjectGraph *tehb =
+              new experimental::BufferSubjectGraph(oehb, user, tehbStr);
+        }
+      }
+    }
+  });
 }
 
 void MAPBUFBuffers::findMinimumFeedbackArcSet() {
@@ -501,7 +484,8 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
           (getUniqueName(op) + "_" + getUniqueName(user)).str());
       edgeToOps[std::make_pair(op, user)] = edge;
       model.update();
-      modelFeedback.addConstr(userOpVar - currentOpVar + 100 * edge >= 1,
+      modelFeedback.addConstr(userOpVar - currentOpVar + bigConstant * edge >=
+                                  1,
                               "operation_order");
     }
   });
@@ -528,17 +512,100 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
     auto *inputOp = ops.first;
     auto *outputOp = ops.second;
     if (edgeVar.get(GRB_DoubleAttr_X) > 0) {
-      for (Value operand : outputOp->getOperands()) {
+      for (Value result : outputOp->getOperands()) {
         // for (Value result : inputOp->getResults()) {
-        if (!operand.getDefiningOp<handshake::MemoryOpInterface>() &&
-            !isa<handshake::MemoryOpInterface>(*operand.getUsers().begin())) {
+        if (!result.getDefiningOp<handshake::MemoryOpInterface>() &&
+            !isa<handshake::MemoryOpInterface>(*result.getUsers().begin())) {
           // no buffers on MCs because they
           // form self loops
-          if (operand.getDefiningOp() == inputOp) {
-            placeBuffersHelper(operand, outputOp);
+          if (result.getDefiningOp() == inputOp) {
+            handshake::ChannelBufProps &resProps = channelProps[result];
+            if (resProps.maxTrans.value_or(1) >= 1) {
+              GRBVar &bufVar = vars.channelVars[result]
+                                   .signalVars[SignalType::READY]
+                                   .bufPresent;
+              model.addConstr(bufVar == 1, "backedge_ready");
+            }
+            if (resProps.maxOpaque.value_or(1) >= 1) {
+              GRBVar &bufVar = vars.channelVars[result]
+                                   .signalVars[SignalType::DATA]
+                                   .bufPresent;
+              model.addConstr(bufVar == 1, "backedge_data");
+            }
+            std::string oehbStr = "oehb";
+            std::string tehbStr = "tehb";
+            experimental::BufferSubjectGraph *oehb =
+                new experimental::BufferSubjectGraph(inputOp, outputOp,
+                                                     oehbStr);
+            experimental::BufferSubjectGraph *tehb =
+                new experimental::BufferSubjectGraph(oehb, outputOp, tehbStr);
           }
         }
       }
+    }
+  }
+}
+
+void MAPBUFBuffers::connectSubjectGraph() {
+  // // remove br modules from subject graph
+  // for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
+  //   auto *moduleGraph = module.first;
+  //   std::string &moduleType = moduleGraph->getModuleType();
+  //   if (moduleType == "br") {
+  //     // br has one input and one output
+  //     auto brInput = moduleGraph->getInputSubjectGraphs();
+  //     auto brOutput = moduleGraph->getOutputSubjectGraphs();
+  //     experimental::BaseSubjectGraph::changeInput(brOutput[0],
+  //     brInput[0],
+  //                                                 moduleGraph);
+  //     experimental::BaseSubjectGraph::changeOutput(brInput[0],
+  //     brOutput[0],
+  //                                                  moduleGraph);
+  //   }
+  // }
+  // Create a directory named "submodules" under blifFile.str()
+  // std::string submodulesDir = blifFile.str() + "submodules";
+  // if (!std::filesystem::create_directory(submodulesDir)) {
+  //   llvm::errs() << "Failed to create directory: " << submodulesDir << "\n";
+  // }
+  for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
+    module.first->connectInputNodes();
+    // std::string &uniqueName = module.first->getUniqueNameGraph();
+    // module.first->getBlifData()->generateBlifFile(
+    //     blifFile.str() + "submodules/" + uniqueName + ".blif");
+  }
+
+  experimental::BlifData *mergedBlif = new experimental::BlifData();
+  for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
+    experimental::BlifData *blifModule = module.first->getBlifData();
+    for (auto &latch : blifModule->getLatches()) {
+      mergedBlif->addLatch(latch.first, latch.second);
+    }
+    for (auto &node : blifModule->getNodesInOrder()) {
+      mergedBlif->addNode(node);
+    }
+  }
+
+  mergedBlif->traverseNodes();
+  mergedBlif->setModuleName("merged");
+  // mergedBlif->generateBlifFile(blifFile.str() + "merged.blif");
+  blifData = mergedBlif;
+}
+
+void MAPBUFBuffers::addCutSelectionConflicts(experimental::Node *key,
+                                             experimental::Node *leaf,
+                                             GRBVar &cutSelectionVar) {
+  // Get the path from the leaf to the root
+  std::vector<experimental::Node *> path;
+  path = getOrCreateLeafToRootPath(key, leaf, leafToRootPaths, blifData);
+  for (auto &nodePath : path) {
+    // Loop over edges in the path from the leaf to the root. Add cut
+    // selection conflict constraints for channels that are on the
+    // path.
+    if (nodePath->gurobiVars->bufferVar.has_value()) {
+      model.addConstr(1 >= nodePath->gurobiVars->bufferVar.value() +
+                               cutSelectionVar,
+                      "cut_selection_conflict");
     }
   }
 }
@@ -564,10 +631,7 @@ void MAPBUFBuffers::setup() {
   bufGroups.push_back(dataValidGroup);
   bufGroups.push_back(readyGroup);
 
-  // Call the generator class to initialize the subject graphs of the modules
-  experimental::SubjectGraphGenerator subjectGraphGenerator(funcInfo.funcOp);
   std::vector<Value> allChannels;
-
   for (auto &[channel, _] : channelProps) {
     // Create channel variables and constraints
     allChannels.push_back(channel);
@@ -590,148 +654,57 @@ void MAPBUFBuffers::setup() {
     addUnitElasticityConstraints(&op, channelFilter);
   }
 
-  // // remove br modules from subject graph
-  // for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
-  //   auto *moduleGraph = module.first;
-  //   std::string &moduleType = moduleGraph->getModuleType();
-  //   if (moduleType == "br") {
-  //     // br has one input and one output
-  //     auto brInput = moduleGraph->getInputSubjectGraphs();
-  //     auto brOutput = moduleGraph->getOutputSubjectGraphs();
-  //     experimental::BaseSubjectGraph::changeInput(brOutput[0],
-  //     brInput[0],
-  //                                                 moduleGraph);
-  //     experimental::BaseSubjectGraph::changeOutput(brInput[0],
-  //     brOutput[0],
-  //                                                  moduleGraph);
-  //   }
-  // }
-
+  // Call the generator class to initialize the subject graphs of the modules
+  experimental::SubjectGraphGenerator generateSubjectGraph(funcInfo.funcOp);
   addCutLoopbackBuffers();
   // findMinimumFeedbackArcSet();
+  connectSubjectGraph();
 
-  // Create a directory named "submodules" under blifFile.str()
-  std::string submodulesDir = blifFile.str() + "submodules";
-  if (!std::filesystem::create_directory(submodulesDir)) {
-    llvm::errs() << "Failed to create directory: " << submodulesDir << "\n";
-  }
+  experimental::Cuts generateCuts(blifData, 6);
 
-  for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
-    std::string &uniqueName = module.first->getUniqueNameGraph();
-    module.first->connectInputNodes();
-    module.first->getBlifData()->generateBlifFile(
-        blifFile.str() + "submodules/" + uniqueName + ".blif");
-  }
-
-  experimental::BlifData *mergedBlif = new experimental::BlifData();
-  for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
-    experimental::BlifData *blifModule = module.first->getBlifData();
-    for (auto &latch : blifModule->getLatches()) {
-      mergedBlif->addLatch(latch.first, latch.second);
-    }
-    for (auto &node : blifModule->getNodesInOrder()) {
-      mergedBlif->addNode(node);
-    }
-  }
-
-  mergedBlif->traverseNodes();
-  mergedBlif->setModuleName("merged");
-  mergedBlif->generateBlifFile(blifFile.str() + "merged.blif");
-
-  experimental::Cuts cutsAnchorsRemoved(mergedBlif, 6, 0);
-  cutsAnchorsRemoved.runCutAlgos(false, true, true);
-  experimental::Cuts::printCuts("cuts.txt");
-
-  addClockPeriodConstraintsNodes(*mergedBlif);
+  addClockPeriodConstraintsNodes();
   addBlackboxConstraints();
   addCutSelectionConstraints();
-  model.update();
 
-  pathMap leafToRootPaths;
   for (auto &rootCutPair : experimental::Cuts::cuts) {
-    // Loop over each subject graph edge
+    // Using cut map to loop over subject graph edges, as each edge has cuts
     auto *root = rootCutPair.first;
     auto &cutVector = rootCutPair.second;
-
-    // llvm::errs() << "Adding constraints for node: " << key->str() <<
-    // "\n";
-
-    // Retrieve the Gurobi variable corresponding to the subject graph edge.
-    // If the edge corresponds to a dataflow channel, then we need to
-    // retrieve the variable corresponding to the pathIn of the channel.
     GRBVar &nodeVar = root->gurobiVars->tIn;
     std::set<experimental::Node *> fanIns = root->getFanins();
 
     if (fanIns.size() == 1) {
       // if a node has single fanin, then it is not mapped to LUTs. The
-      // delay of the node is equal to the delay of the fanin. No cut should
-      // be selected for these nodes, the other cuts are present for the
-      // correct cut enumeration.
-
-      // llvm::errs() << "Adding single fanin delay constraint for fanin: "
-      //              << (*fanIns.begin())->str() << "\n";
+      // delay of the node is equal to the delay of the fanin.
       GRBVar &faninVar = (*fanIns.begin())->gurobiVars->tOut;
       model.addConstr(nodeVar == faninVar, "single_fanin_delay");
       continue;
     }
 
     for (auto &cut : cutVector) {
-      // Loop over each cut of the subject graph edge
+      // Loop over the cuts of the subject graph edge
       GRBVar &cutSelectionVar = cut.cutSelection;
-      if ((cut.leaves.size() == 1) && (*cut.leaves.begin() == root)) {
-        // if the cut has a single leaf and it is equal to the root node,
-        // then it's the trivial cut. The LUT is created by the fanins of
-        // the root node.
-        for (auto &fanIn : fanIns) {
-          // llvm::errs() << "Adding trivial cut delay constraint for fanin:
-          // "
-          //              << fanIn->str() << "\n";
-          GRBVar &faninVar = fanIn->gurobiVars->tOut;
-          model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
-                              faninVar + lutDelay,
-                          "trivial_cut_delay");
-        }
-        continue;
-      }
-
-      for (auto *leaf : cut.leaves) {
-        // Loop over each leaf of the cut
-        // Retrieve the Gurobi variable corresponding to the leaf. If the
-        // leaf is a dataflow channel, then retrieve the pathOut variable of
-        // the channel.
-
-        // llvm::errs() << "Adding delay propagation constraint for fanin: "
-        //              << leaf->str() << " and leaf: " << leaf->str() <<
-        //              "\n";
-        // Add the delay propagation constraint
-
+      auto addDelayPropagationConstraint = [&](experimental::Node *leaf,
+                                               const char *name) {
         GRBVar &leafVar = leaf->gurobiVars->tOut;
         model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
                             leafVar + lutDelay,
-                        "delay_propagation");
+                        name);
+      };
 
-        // Get the path from the leaf to the root
-        std::vector<experimental::Node *> path;
-        path =
-            getOrCreateLeafToRootPath(root, leaf, leafToRootPaths, *mergedBlif);
-        for (auto &nodePath : path) {
-          // Loop over edges in the path from the leaf to the root. Add cut
-          // selection conflict constraints for channels that are on the
-          // path.
-          if (nodePath->gurobiVars->bufferVar.has_value()) {
-            // llvm::errs()
-            //     << "Adding cut selection conflict constraint for node: "
-            //     << key->str() << " and leaf: " << leaf->str() << "\n";
-            model.addConstr(1 >= nodePath->gurobiVars->bufferVar.value() +
-                                     cutSelectionVar,
-                            "cut_selection_conflict");
+      for (auto *leaf : cut.leaves) { // Loop over leaves of the cut
+        if ((cut.leaves.size() == 1) && (leaf == root)) {
+          // Trivial cut. Delay is propagated from the fanins of the root
+          for (auto &fanIn : fanIns) {
+            addDelayPropagationConstraint(fanIn, "trivial_cut_delay");
           }
+          continue;
         }
+        addDelayPropagationConstraint(leaf, "delay_propagation");
+        addCutSelectionConflicts(root, leaf, cutSelectionVar);
       }
     }
   }
-
-  model.update();
 
   SmallVector<CFDFC *> cfdfcs;
   for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {

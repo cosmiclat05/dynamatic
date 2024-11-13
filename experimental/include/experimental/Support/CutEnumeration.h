@@ -43,15 +43,15 @@ public:
 
   void addLeaf(Node *leaf) { leaves.insert(leaf); }
 
-  Node *getNode() { return root; }
-
-  std::set<Node *> getLeaves() const { return leaves; }
-
-  void setLeaves(std::set<Node *> &leaves) { this->leaves = leaves; }
-
   void addLeaves(std::set<Node *> &leaves) {
     this->leaves.insert(leaves.begin(), leaves.end());
   }
+
+  void setLeaves(std::set<Node *> &leaves) { this->leaves = leaves; }
+
+  Node *getNode() { return root; }
+
+  std::set<Node *> getLeaves() const { return leaves; }
 
   Node *getRoot() { return root; }
 
@@ -71,45 +71,24 @@ struct NodePtrEqual {
 };
 
 class Cuts {
+private:
+  experimental::BlifData *blif;
+  int lutSize{};
+  const int expansionWithChannels = 6;
+
 public:
   static inline std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
                                    NodePtrEqual>
       cuts;
-  experimental::BlifData* blif;
-  int lutSize{};
-  int maxExpansion{};
 
-  Cuts(BlifData *blif, int lutSize, int maxExpansion)
-      : blif(blif), lutSize(lutSize), maxExpansion(maxExpansion){};
+  Cuts(BlifData *blif, int lutSize) : blif(blif), lutSize(lutSize) {
+    this->runCutAlgos();
+  };
 
-  std::vector<Cut> enumerateCuts(Node *node,
-                                 const std::vector<std::vector<Cut>> &faninCuts,
-                                 int lutSize);
   std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-  computeAllCuts();
-  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-  cutless();
-  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-  cutlessReal();
-  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-  cutlessChannels();
-  void runCutAlgos(bool computeAllCuts, bool cutless, bool cutlessChannelsBool);
-  void readFromFile(const std::string &filename);
+  cutless(bool includeChannels);
+  void runCutAlgos();
   static void printCuts(std::string filename);
-
-  void addCut(Node *node, const Cut &newCut) {
-    if (cuts.find(node) == cuts.end()) {
-      cuts[node] = std::vector<Cut>();
-    }
-    cuts[node].push_back(newCut);
-  }
-
-  std::vector<Cut> getCuts(Node *node) {
-    if (cuts.find(node) != cuts.end()) {
-      return cuts[node];
-    }
-    return std::vector<Cut>();
-  }
 };
 
 } // namespace experimental
