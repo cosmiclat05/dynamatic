@@ -25,7 +25,6 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutEnumeration.h"
-#include "llvm/ADT/StringRef.h"
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -69,49 +68,80 @@ public:
                 StringRef milpName = "placement");
 
 protected:
-  /// Interprets the MILP solution to derive buffer placement decisions. Since
-  /// the MILP cannot encode the placement of both opaque and transparent slots
-  /// on a single channel, some "interpretation" of the results is necessary to
-  /// derive "mixed" placements where some buffer slots are opaque and some are
-  /// transparent. This interpretation is partically controlled by the
-  /// `legacyPlacement` flag, and always respects the channel-specific buffering
-  /// constraints.
+  /// The same extractResult function used in FPL22Buffers.
   void extractResult(BufferPlacement &placement) override;
 
 private:
-  StringRef blifFile;
-  experimental::BlifData *blifData;
   float lutDelay = 0.55;
   int bigConstant = 100;
+  experimental::BlifData *blifData;
   pathMap leafToRootPaths;
+  StringRef blifFile;
+
+  // Adds Blackbox Constraints for the Data Signals of blackbox ADDI, SUBI and
+  // CMPI modules. These delays are retrieved from Vivado Timing Reports. Ready
+  // and Valid signals are not blackboxed.
+  void addBlackboxConstraints();
 
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
   void addCustomChannelConstraints(Value channel);
 
+  // Adds Cut Selection Constraints, ensuring that only 1 cut is selected per
+  // node
   void addCutSelectionConstraints();
 
-  void addCutLoopbackBuffers();
-
-  void addBlackboxConstraints();
-
-  void addClockPeriodConstraintsNodes();
-
-  void instantiateCutLoopbackBuffers(BufferPlacement &placement);
-
-  void addClockPeriodConstraintsChannels(Value channel, SignalType signal);
-
-  void findMinimumFeedbackArcSet();
-
-  void connectSubjectGraph();
-
-  void addCutSelectionConflicts(experimental::Node *key,
+  // Adds Cut Selection Conflict Constraints. These constraints ensure that
+  // either a buffer is placed on a DFG edge or the cut that containts that edge
+  // is selected.
+  void addCutSelectionConflicts(experimental::Node *root,
                                 experimental::Node *leaf,
                                 GRBVar &cutSelectionVar);
 
-  /// Setups the entire MILP, creating all variables, constraints, and setting
-  /// the system's objective. Called by the constructor in the absence of prior
-  /// failures, after which the MILP is ready to be optimized.
+  // Inserts Buffers on Back Edges. This is done by adding constraints to the
+  // Gurobi Model, and inserting buffers into Subject Graph. The function loops
+  // over all the channels and checks if the channel is a back edge. If it is a
+  // back edge, then a buffer is inserted.
+  void addCutLoopbackBuffers();
+
+  // Converts the Cyclic Graph into an Acyclic Graph by determining the Minimum
+  // Feedback Arc Set (MFAS). A graph can only be acyclic if a topological
+  // ordering can be found. An additional MILP is used here, which enforces a
+  // topological ordering. Since our graph is cyclic, a topological ordering
+  // cannot be found without removing some edges. The MILP formulated here
+  // minimizes the number of edges that needs to be removed in order to make the
+  // graph acyclic. Then, buffers are inserted on the edges that needs to be
+  // removed to make the graph acyclic.
+  void findMinimumFeedbackArcSet();
+
+  // Add clock period constraints for subject graph edges. For subject graph
+  // edges, only a single timing variable is requires, as opposed to data flow
+  // graph edges where two timing variables are required. Also adds constraints
+  // for primary inputs and constants.
+  void addClockPeriodConstraintsNodes();
+
+  // Adds Clock Period Constraints, Buffer Insertion and Channel Constraints to
+  // the Dataflow Graph Edges.
+  void addClockPeriodConstraintsChannels(Value channel, SignalType signal);
+
+  // Adds Delay Propagation Constraints for all the cuts by looping over cuts
+  // map. If a node has only one fanin, delay is propagated from the fanin.
+  // Otherwise, delay is propagated from the leaves of the cut. Loops over the
+  // leaves of the cut and adds delay propagation constraints for each leaf.
+  // Also adds cut selection conflict constraints.
+  void addDelayPropagationConstraints();
+
+  // After initializing the individual Subject Graphs, connects the Subject
+  // Graphs by connecting the input and output nodes of the adjacent modules.
+  // Then generates the merged Subject Graph, which is the overall Subject Graph
+  // of the entire circuit. blifData variable is assigned using this Subject
+  // Graph.
+  void connectSubjectGraphs();
+
+  /// Setups the entire MILP, creating all variables, constraints, and
+  /// setting the system's objective. Called by the constructor in the
+  /// absence of prior failures, after which the MILP is ready to be
+  /// optimized.
   void setup();
 };
 

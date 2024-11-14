@@ -1,6 +1,6 @@
 set-dynamatic-path  .
 
-set-src             integration-test/matrix/matrix.c
+set-src             integration-test/fir/fir.c
 compile --buffer-algorithm mapbuf
 write-hdl
 simulate

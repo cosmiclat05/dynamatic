@@ -29,33 +29,39 @@ namespace experimental {
 
 class Cut {
 public:
-  GRBVar nodeVar;
-  GRBVar cutSelection;
-  Node *root;
-  std::set<Node *> leaves;
-  int depth;
-
-  Cut(Node *root, int depth = 0) : root(root), depth(depth){};
+  Cut(Node *root, int depth = 0) : depth(depth), root(root){};
+  // for trivial cuts
   Cut(Node *root, Node *leaf, int depth = 0)
-      : root(root), leaves({leaf}), depth(depth){}; // for trivial cuts
+      : depth(depth), leaves({leaf}), root(root){}; 
   Cut(Node *root, std::set<Node *> leaves, int depth = 0)
-      : root(root), leaves(leaves), depth(depth){};
+      : depth(depth), leaves({leaves}), root(root){};
 
-  void addLeaf(Node *leaf) { leaves.insert(leaf); }
+  // Getters and Setters
+  int getDepth() { return depth; }
 
-  void addLeaves(std::set<Node *> &leaves) {
-    this->leaves.insert(leaves.begin(), leaves.end());
-  }
-
-  void setLeaves(std::set<Node *> &leaves) { this->leaves = leaves; }
+  GRBVar &getCutSelectionVariable() { return cutSelection; }
 
   Node *getNode() { return root; }
 
-  std::set<Node *> getLeaves() const { return leaves; }
+  std::set<Node *>& getLeaves() { return leaves; }
 
-  Node *getRoot() { return root; }
+  void addLeaves(Node *leaf) { this->leaves.insert(leaf); }
 
-  int getDepth() { return depth; }
+  void addLeaves(std::set<Node *> &leavesToAdd) {
+    this->leaves.insert(leavesToAdd.begin(), leavesToAdd.end());
+  }
+
+  void setLeaves(std::set<Node *> &leavesToSet) { this->leaves = leavesToSet; }
+
+private:
+  // depth of the cut
+  int depth;
+  // Gurobi variable for cut selection
+  GRBVar cutSelection;
+  // leaves of the cut
+  std::set<Node *> leaves;
+  // root of the cut
+  Node *root;
 };
 
 struct NodePtrHash {
@@ -70,25 +76,28 @@ struct NodePtrEqual {
   }
 };
 
+using NodeToCuts =
+    std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>;
+
 class Cuts {
-private:
-  experimental::BlifData *blif;
-  int lutSize{};
-  const int expansionWithChannels = 6;
-
 public:
-  static inline std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
-                                   NodePtrEqual>
-      cuts;
+  Cuts(BlifData *blif, int lutSize);
 
-  Cuts(BlifData *blif, int lutSize) : blif(blif), lutSize(lutSize) {
-    this->runCutAlgos();
-  };
+  // Node to Cuts Map
+  static inline NodeToCuts cuts;
+  // Prints cuts to a file
+  static void printCuts(const std::string &filename);
 
-  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-  cutless(bool includeChannels);
-  void runCutAlgos();
-  static void printCuts(std::string filename);
+private:
+  // how many times to expand the cutless cuts when including channels
+  const int expansionWithChannels = 6;
+  // size of the LUT
+  int lutSize{};
+  // AIG that the cut enumeration is performed on
+  experimental::BlifData *blif;
+
+  // Cutless algorithm
+  NodeToCuts cutless(bool includeChannels);
 };
 
 } // namespace experimental

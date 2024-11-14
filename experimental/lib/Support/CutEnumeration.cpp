@@ -13,9 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <fstream>
-#include <list>
 #include <set>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -24,12 +22,11 @@
 
 using namespace dynamatic::experimental;
 
-
 void sortAndEraseCuts(std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
                                          NodePtrEqual> &cuts) {
   for (auto &[node, cutVector] : cuts) {
     std::sort(cutVector.begin(), cutVector.end(),
-              [](const Cut &a, const Cut &b) {
+              [](Cut &a, Cut &b) {
                 // Get the sets first
                 const auto leavesA = a.getLeaves();
                 const auto leavesB = b.getLeaves();
@@ -69,7 +66,7 @@ void sortAndEraseCuts(std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
 
     // Remove duplicates
     cutVector.erase(std::unique(cutVector.begin(), cutVector.end(),
-                                [](const Cut &a, const Cut &b) {
+                                [](Cut &a, Cut &b) {
                                   const auto leavesA = a.getLeaves();
                                   const auto leavesB = b.getLeaves();
 
@@ -109,13 +106,55 @@ void sortAndEraseCuts(std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
   }
 }
 
-std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-Cuts::cutless(bool includeChannels) {
+Cuts::Cuts(BlifData *blif, int lutSize) : lutSize(lutSize), blif(blif) {
+  // Call the cutless algorithm, if argument is true, include channels in the
+  // Primary Inputs set as well
+  auto cutsWithoutChannels = cutless(false);
+  auto cutsWithChannels = cutless(true);
+
+  // Merge cuts
+  cuts = std::move(cutsWithoutChannels);
+  for (const auto &[node, cutVector] : cutsWithChannels) {
+    cuts[node].insert(cuts[node].end(), cutVector.begin(), cutVector.end());
+  }
+
+  sortAndEraseCuts(cuts);
+};
+
+void Cuts::printCuts(const std::string &filename) {
+  std::ofstream outFile("../mapbuf/" + filename);
+  if (!outFile.is_open()) {
+    llvm::errs() << "Error: Unable to open file for writing.\n";
+    return;
+  }
+
+  for (auto &nodeCuts : cuts) {
+    Node *node = nodeCuts.first;
+    std::vector<Cut> &cutList = nodeCuts.second;
+    std::size_t numCuts = cutList.size();
+
+    outFile << node->str() << " " << numCuts << "\n";
+
+    for (size_t i = 0; i < cutList.size(); ++i) {
+      Cut &cut = cutList[i];
+      std::set<Node *> leaves = cut.getLeaves();
+      std::size_t cutSize = leaves.size();
+      outFile << "Cut #" << i << ": " << cutSize << " depth: " << cut.getDepth()
+              << "\n";
+
+      for (auto *leaf : leaves) {
+        outFile << '\t' << leaf->str() << "\n";
+      }
+    }
+  }
+  outFile.close();
+}
+
+NodeToCuts Cuts::cutless(bool includeChannels) {
   int n = 0;
   std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
   std::set<Node *> nextWavyLine;
-  std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>
-      cutlessCuts;
+  NodeToCuts cutlessCuts;
 
   if (includeChannels) {
     for (auto *channel : blif->getChannels()) {
@@ -166,49 +205,5 @@ Cuts::cutless(bool includeChannels) {
 
   return cutlessCuts;
 }
-
-void Cuts::runCutAlgos() {
-  auto cutsWithoutChannels = cutless(false);
-  auto cutsWithChannels = cutless(true);
-
-  // Merge cuts
-  cuts = std::move(cutsWithoutChannels);
-  for (const auto &[node, cutVector] : cutsWithChannels) {
-    cuts[node].insert(cuts[node].end(), cutVector.begin(), cutVector.end());
-  }
-
-  sortAndEraseCuts(cuts);
-  //printCuts("cuts.txt");
-}
-
-void Cuts::printCuts(std::string filename) {
-  std::ofstream outFile("../mapbuf/" + filename);
-  if (!outFile.is_open()) {
-    llvm::errs() << "Error: Unable to open file for writing.\n";
-    return;
-  }
-
-  for (auto &nodeCuts : cuts) {
-    Node *node = nodeCuts.first;
-    std::vector<Cut> &cutList = nodeCuts.second;
-    std::size_t numCuts = cutList.size();
-
-    outFile << node->str() << " " << numCuts << "\n";
-
-    for (size_t i = 0; i < cutList.size(); ++i) {
-      Cut &cut = cutList[i];
-      std::set<Node *> leaves = cut.getLeaves();
-      std::size_t cutSize = leaves.size();
-      outFile << "Cut #" << i << ": " << cutSize << " depth: " << cut.getDepth()
-              << "\n";
-
-      for (auto *leaf : leaves) {
-        outFile << '\t' << leaf->str() << "\n";
-      }
-    }
-  }
-  outFile.close();
-}
-
 
 // CutEnumeration end
