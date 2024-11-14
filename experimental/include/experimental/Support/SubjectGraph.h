@@ -79,6 +79,7 @@ public:
   static inline DenseMap<BaseSubjectGraph *, Operation *> subjectGraphMap;
 
 protected:
+  bool isBlackbox = false;
   Operation *op;
   std::vector<Operation *> inputModules;
   std::vector<Operation *> outputModules;
@@ -96,6 +97,7 @@ protected:
   BlifData *blifData;
 
   void assignSignals(ChannelSignals &signals, Node *node, const std::string &nodeName);
+  void connectInputNodesHelper(ChannelSignals &currentSignals, BaseSubjectGraph* moduleBeforeSubjectGraph);
 
 public:
   BaseSubjectGraph();
@@ -125,7 +127,6 @@ private:
   unsigned int dataWidth = 0;
   std::unordered_map<unsigned int, ChannelSignals> inputNodes;
   ChannelSignals outputSignals;
-  bool isBlackbox = false;
 
 public:
   ArithSubjectGraph(Operation *op);
@@ -136,7 +137,6 @@ public:
 class CmpISubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
-  bool isBlackbox = false;
   std::unordered_map<unsigned int, ChannelSignals> inputNodes;
   ChannelSignals outputSignals;
 

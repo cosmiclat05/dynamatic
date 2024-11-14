@@ -13,17 +13,6 @@
 #include <iterator>
 using namespace dynamatic::experimental;
 
-void BaseSubjectGraph::assignSignals(ChannelSignals &signals, Node *node,
-                                     const std::string &nodeName) {
-  if (nodeName.find("valid") != std::string::npos) {
-    signals.validSignal = node;
-  } else if (nodeName.find("ready") != std::string::npos) {
-    signals.readySignal = node;
-  } else {
-    signals.dataSignals.push_back(node);
-  }
-};
-
 BaseSubjectGraph::BaseSubjectGraph() = default;
 
 BaseSubjectGraph::BaseSubjectGraph(Operation *op) : op(op) {
@@ -65,6 +54,44 @@ BaseSubjectGraph::BaseSubjectGraph(Operation *before, Operation *after) {
   outputSubjectGraphs.push_back(afterSubjectGraph);
   inputModuleToResNum[before] = 0;
 }
+
+void BaseSubjectGraph::connectInputNodesHelper(
+    ChannelSignals &currentSignals,
+    BaseSubjectGraph *moduleBeforeSubjectGraph) {
+  ChannelSignals &moduleBeforeOutputNodes =
+      moduleBeforeSubjectGraph->returnOutputNodes(
+          inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
+
+  connectSignals(moduleBeforeOutputNodes.readySignal,
+                 currentSignals.readySignal);
+  connectSignals(currentSignals.validSignal,
+                 moduleBeforeOutputNodes.validSignal);
+
+  if (isBlackbox) {
+    // If the module is a blackbox, we don't need to connect the data signals,
+    // as it will result in cut generation for blackbox modules
+    for (auto *node : currentSignals.dataSignals) {
+      node->setInput(false);
+      node->setOutput(false);
+    }
+  } else {
+    for (unsigned int j = 0; j < currentSignals.dataSignals.size(); j++) {
+      connectSignals(currentSignals.dataSignals[j],
+                     moduleBeforeOutputNodes.dataSignals[j]);
+    }
+  }
+}
+
+void BaseSubjectGraph::assignSignals(ChannelSignals &signals, Node *node,
+                                     const std::string &nodeName) {
+  if (nodeName.find("valid") != std::string::npos) {
+    signals.validSignal = node;
+  } else if (nodeName.find("ready") != std::string::npos) {
+    signals.readySignal = node;
+  } else {
+    signals.dataSignals.push_back(node);
+  }
+};
 
 void BaseSubjectGraph::replaceOpsBySubjectGraph() {
   for (auto *inputModule : inputModules) {
@@ -232,29 +259,7 @@ ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
 void ArithSubjectGraph::connectInputNodes() {
   for (unsigned int i = 0; i < inputNodes.size(); i++) {
-    auto &currentInputNodes = inputNodes[i];
-    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[i];
-    ChannelSignals &moduleBeforeOutputNodes =
-        moduleBeforeSubjectGraph->returnOutputNodes(
-            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-    connectSignals(moduleBeforeOutputNodes.readySignal,
-                   currentInputNodes.readySignal);
-    connectSignals(currentInputNodes.validSignal,
-                   moduleBeforeOutputNodes.validSignal);
-
-    if (isBlackbox) {
-      for (auto *node : currentInputNodes.dataSignals) {
-        node->setInput(false);
-        node->setOutput(false);
-      }
-      continue;
-    }
-
-    for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-      connectSignals(currentInputNodes.dataSignals[j],
-                     moduleBeforeOutputNodes.dataSignals[j]);
-    }
+    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i]);
   }
 }
 
@@ -303,29 +308,7 @@ CmpISubjectGraph::CmpISubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
 void CmpISubjectGraph::connectInputNodes() {
   for (unsigned int i = 0; i < inputNodes.size(); i++) {
-    auto &currentInputNodes = inputNodes[i];
-    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[i];
-    ChannelSignals &moduleBeforeOutputNodes =
-        moduleBeforeSubjectGraph->returnOutputNodes(
-            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-    connectSignals(moduleBeforeOutputNodes.readySignal,
-                   currentInputNodes.readySignal);
-    connectSignals(currentInputNodes.validSignal,
-                   moduleBeforeOutputNodes.validSignal);
-
-    if (isBlackbox) {
-      for (auto *node : currentInputNodes.dataSignals) {
-        node->setInput(false);
-        node->setOutput(false);
-      }
-      continue;
-    }
-
-    for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-      connectSignals(currentInputNodes.dataSignals[j],
-                     moduleBeforeOutputNodes.dataSignals[j]);
-    }
+    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i]);
   }
 }
 
@@ -431,23 +414,8 @@ ForkSubjectGraph::ForkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 }
 
 void ForkSubjectGraph::connectInputNodes() {
-  auto &currentInputNodes = inputNodes;
-  if (inputModules.empty()) {
-    return;
-  }
-  auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
-  ChannelSignals &moduleBeforeOutputNodes =
-      moduleBeforeSubjectGraph->returnOutputNodes(
-          inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-  connectSignals(moduleBeforeOutputNodes.readySignal,
-                 currentInputNodes.readySignal);
-  connectSignals(currentInputNodes.validSignal,
-                 moduleBeforeOutputNodes.validSignal);
-
-  for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-    connectSignals(currentInputNodes.dataSignals[j],
-                   moduleBeforeOutputNodes.dataSignals[j]);
+  if (!inputModules.empty()) {
+    connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
   }
 }
 
@@ -499,39 +467,11 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 }
 
 void MuxSubjectGraph::connectInputNodes() {
-  for (unsigned int i = 0; i < inputNodes.size(); i++) {
-    auto &currentInputNodes = inputNodes[i];
-    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[i + 1];
-    ChannelSignals &moduleBeforeOutputNodes =
-        moduleBeforeSubjectGraph->returnOutputNodes(
-            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-    connectSignals(moduleBeforeOutputNodes.readySignal,
-                   currentInputNodes.readySignal);
-    connectSignals(currentInputNodes.validSignal,
-                   moduleBeforeOutputNodes.validSignal);
-
-    for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-      connectSignals(currentInputNodes.dataSignals[j],
-                     moduleBeforeOutputNodes.dataSignals[j]);
-    }
-  }
-
   // index is the first input
-  auto &currentIndexNodes = indexNodes;
-  auto *moduleBeforeSubjectGraph = inputSubjectGraphs.front();
-  ChannelSignals &moduleBeforeOutputNodes =
-      moduleBeforeSubjectGraph->returnOutputNodes(
-          inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
+  connectInputNodesHelper(indexNodes, inputSubjectGraphs[0]);
 
-  connectSignals(moduleBeforeOutputNodes.readySignal,
-                 currentIndexNodes.readySignal);
-  connectSignals(currentIndexNodes.validSignal,
-                 moduleBeforeOutputNodes.validSignal);
-
-  for (unsigned int j = 0; j < currentIndexNodes.dataSignals.size(); j++) {
-    connectSignals(currentIndexNodes.dataSignals[j],
-                   moduleBeforeOutputNodes.dataSignals[j]);
+  for (unsigned int i = 0; i < inputNodes.size(); i++) {
+    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i + 1]);
   }
 }
 
@@ -595,21 +535,7 @@ ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
 
 void ControlMergeSubjectGraph::connectInputNodes() {
   for (unsigned int i = 0; i < inputNodes.size(); i++) {
-    auto &currentInputNodes = inputNodes[i];
-    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[i];
-    ChannelSignals &moduleBeforeOutputNodes =
-        moduleBeforeSubjectGraph->returnOutputNodes(
-            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-    connectSignals(moduleBeforeOutputNodes.readySignal,
-                   currentInputNodes.readySignal);
-    connectSignals(currentInputNodes.validSignal,
-                   moduleBeforeOutputNodes.validSignal);
-
-    for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-      connectSignals(currentInputNodes.dataSignals[j],
-                     moduleBeforeOutputNodes.dataSignals[j]);
-    }
+    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i]);
   }
 }
 
@@ -660,39 +586,8 @@ ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
 }
 
 void ConditionalBranchSubjectGraph::connectInputNodes() {
-  {
-    auto &currentInputNodes = conditionNodes;
-    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
-    ChannelSignals &moduleBeforeOutputNodes =
-        moduleBeforeSubjectGraph->returnOutputNodes(
-            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-    connectSignals(moduleBeforeOutputNodes.readySignal,
-                   currentInputNodes.readySignal);
-    connectSignals(currentInputNodes.validSignal,
-                   moduleBeforeOutputNodes.validSignal);
-
-    for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-      connectSignals(currentInputNodes.dataSignals[j],
-                     moduleBeforeOutputNodes.dataSignals[j]);
-    }
-  }
-  {
-    auto &currentInputNodes = inputNodes;
-    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[1];
-    ChannelSignals &moduleBeforeOutputNodes =
-        moduleBeforeSubjectGraph->returnOutputNodes(
-            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-    connectSignals(moduleBeforeOutputNodes.readySignal,
-                   currentInputNodes.readySignal);
-    connectSignals(currentInputNodes.validSignal,
-                   moduleBeforeOutputNodes.validSignal);
-
-    for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-      connectSignals(currentInputNodes.dataSignals[j],
-                     moduleBeforeOutputNodes.dataSignals[j]);
-    }
-  }
+  connectInputNodesHelper(conditionNodes, inputSubjectGraphs[0]);
+  connectInputNodesHelper(inputNodes, inputSubjectGraphs[1]);
 }
 
 ChannelSignals &
@@ -766,21 +661,7 @@ LoadSubjectGraph::LoadSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 }
 
 void LoadSubjectGraph::connectInputNodes() {
-  auto &currentInputNodes = addrInSignals;
-  auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
-  ChannelSignals &moduleBeforeOutputNodes =
-      moduleBeforeSubjectGraph->returnOutputNodes(
-          inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-  connectSignals(moduleBeforeOutputNodes.readySignal,
-                 currentInputNodes.readySignal);
-  connectSignals(currentInputNodes.validSignal,
-                 moduleBeforeOutputNodes.validSignal);
-
-  for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-    connectSignals(currentInputNodes.dataSignals[j],
-                   moduleBeforeOutputNodes.dataSignals[j]);
-  }
+  connectInputNodesHelper(addrInSignals, inputSubjectGraphs[0]);
 }
 
 ChannelSignals &LoadSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
@@ -822,37 +703,8 @@ StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 }
 
 void StoreSubjectGraph::connectInputNodes() {
-  auto &currentInputNodes = addrInSignals;
-  auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
-  ChannelSignals &moduleBeforeOutputNodes =
-      moduleBeforeSubjectGraph->returnOutputNodes(
-          inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-  connectSignals(moduleBeforeOutputNodes.readySignal,
-                 currentInputNodes.readySignal);
-  connectSignals(currentInputNodes.validSignal,
-                 moduleBeforeOutputNodes.validSignal);
-
-  for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-    connectSignals(currentInputNodes.dataSignals[j],
-                   moduleBeforeOutputNodes.dataSignals[j]);
-  }
-
-  auto &currentInputNodes2 = dataInSignals;
-  auto *moduleBeforeSubjectGraph2 = inputSubjectGraphs[1];
-  ChannelSignals &moduleBeforeOutputNodes2 =
-      moduleBeforeSubjectGraph2->returnOutputNodes(
-          inputSubjectGraphToResNum[moduleBeforeSubjectGraph2]);
-
-  connectSignals(moduleBeforeOutputNodes2.readySignal,
-                 currentInputNodes2.readySignal);
-  connectSignals(currentInputNodes2.validSignal,
-                 moduleBeforeOutputNodes2.validSignal);
-
-  for (unsigned int j = 0; j < currentInputNodes2.dataSignals.size(); j++) {
-    connectSignals(currentInputNodes2.dataSignals[j],
-                   moduleBeforeOutputNodes2.dataSignals[j]);
-  }
+  connectInputNodesHelper(addrInSignals, inputSubjectGraphs[0]);
+  connectInputNodesHelper(dataInSignals, inputSubjectGraphs[1]);
 }
 
 ChannelSignals &
@@ -898,21 +750,7 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
 }
 
 void ConstantSubjectGraph::connectInputNodes() {
-  auto &currentControlSignals = controlSignals;
-  auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
-  ChannelSignals &moduleBeforeOutputNodes =
-      moduleBeforeSubjectGraph->returnOutputNodes(
-          inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-  connectSignals(moduleBeforeOutputNodes.readySignal,
-                 currentControlSignals.readySignal);
-  connectSignals(currentControlSignals.validSignal,
-                 moduleBeforeOutputNodes.validSignal);
-
-  for (unsigned int j = 0; j < currentControlSignals.dataSignals.size(); j++) {
-    connectSignals(currentControlSignals.dataSignals[j],
-                   moduleBeforeOutputNodes.dataSignals[j]);
-  }
+  connectInputNodesHelper(controlSignals, inputSubjectGraphs[0]);
 }
 
 ChannelSignals &
@@ -955,21 +793,7 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
 }
 
 void ExtTruncSubjectGraph::connectInputNodes() {
-  auto &currentInputNodes = inputSignals;
-  auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
-  ChannelSignals &moduleBeforeOutputNodes =
-      moduleBeforeSubjectGraph->returnOutputNodes(
-          inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-  connectSignals(moduleBeforeOutputNodes.readySignal,
-                 currentInputNodes.readySignal);
-  connectSignals(currentInputNodes.validSignal,
-                 moduleBeforeOutputNodes.validSignal);
-
-  for (unsigned int j = 0; j < inputWidth; j++) {
-    connectSignals(currentInputNodes.dataSignals[j],
-                   moduleBeforeOutputNodes.dataSignals[j]);
-  }
+  connectInputNodesHelper(inputSignals, inputSubjectGraphs[0]);
 }
 
 ChannelSignals &
@@ -1015,21 +839,7 @@ SelectSubjectGraph::SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
 void SelectSubjectGraph::connectInputNodes() {
   for (unsigned int i = 0; i < inputSignals.size(); i++) {
-    auto &currentInputNodes = inputSignals[i];
-    auto *moduleBeforeSubjectGraph = inputSubjectGraphs[i];
-    ChannelSignals &moduleBeforeOutputNodes =
-        moduleBeforeSubjectGraph->returnOutputNodes(
-            inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-    connectSignals(moduleBeforeOutputNodes.readySignal,
-                   currentInputNodes.readySignal);
-    connectSignals(currentInputNodes.validSignal,
-                   moduleBeforeOutputNodes.validSignal);
-
-    for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-      connectSignals(currentInputNodes.dataSignals[j],
-                     moduleBeforeOutputNodes.dataSignals[j]);
-    }
+    connectInputNodesHelper(inputSignals[i], inputSubjectGraphs[i]);
   }
 }
 
@@ -1076,24 +886,8 @@ BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
 }
 
 void BranchSinkSubjectGraph::connectInputNodes() {
-  if (inputModules.empty()) {
-    return;
-  }
-  auto &currentInputNodes = inputSignals;
-
-  auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
-  ChannelSignals &moduleBeforeOutputNodes =
-      moduleBeforeSubjectGraph->returnOutputNodes(
-          inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-  connectSignals(moduleBeforeOutputNodes.readySignal,
-                 currentInputNodes.readySignal);
-  connectSignals(currentInputNodes.validSignal,
-                 moduleBeforeOutputNodes.validSignal);
-
-  for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-    connectSignals(currentInputNodes.dataSignals[j],
-                   moduleBeforeOutputNodes.dataSignals[j]);
+  if (!inputModules.empty()) {
+    connectInputNodesHelper(inputSignals, inputSubjectGraphs[0]);
   }
 }
 
@@ -1246,21 +1040,7 @@ BufferSubjectGraph::BufferSubjectGraph(BufferSubjectGraph *graph1,
 }
 
 void BufferSubjectGraph::connectInputNodes() {
-  auto &currentInputNodes = inputSignals;
-  auto *moduleBeforeSubjectGraph = inputSubjectGraphs[0];
-  ChannelSignals &moduleBeforeOutputNodes =
-      moduleBeforeSubjectGraph->returnOutputNodes(
-          inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
-
-  connectSignals(moduleBeforeOutputNodes.readySignal,
-                 currentInputNodes.readySignal);
-  connectSignals(currentInputNodes.validSignal,
-                 moduleBeforeOutputNodes.validSignal);
-
-  for (unsigned int j = 0; j < currentInputNodes.dataSignals.size(); j++) {
-    connectSignals(currentInputNodes.dataSignals[j],
-                   moduleBeforeOutputNodes.dataSignals[j]);
-  }
+  connectInputNodesHelper(inputSignals, inputSubjectGraphs[0]);
 }
 
 ChannelSignals &BufferSubjectGraph::returnOutputNodes(unsigned int) {
