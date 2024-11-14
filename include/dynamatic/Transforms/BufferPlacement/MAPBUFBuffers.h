@@ -81,7 +81,7 @@ private:
   // Adds Blackbox Constraints for the Data Signals of blackbox ADDI, SUBI and
   // CMPI modules. These delays are retrieved from Vivado Timing Reports. Ready
   // and Valid signals are not blackboxed.
-  void addBlackboxConstraints();
+  void addBlackboxConstraints(Value channel);
 
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
@@ -89,7 +89,7 @@ private:
 
   // Adds Cut Selection Constraints, ensuring that only 1 cut is selected per
   // node
-  void addCutSelectionConstraints();
+  void addCutSelectionConstraints(std::vector<experimental::Cut> &cutVector);
 
   // Adds Cut Selection Conflict Constraints. These constraints ensure that
   // either a buffer is placed on a DFG edge or the cut that containts that edge
@@ -129,7 +129,7 @@ private:
   // Otherwise, delay is propagated from the leaves of the cut. Loops over the
   // leaves of the cut and adds delay propagation constraints for each leaf.
   // Also adds cut selection conflict constraints.
-  void addDelayPropagationConstraints();
+  void addDelayPropagationConstraints(experimental::Node* root, std::vector<experimental::Cut> &cutVector);
 
   // After initializing the individual Subject Graphs, connects the Subject
   // Graphs by connecting the input and output nodes of the adjacent modules.

@@ -15,7 +15,6 @@
 #define EXPERIMENTAL_SUPPORT_CUT_ENUMERATION_H
 
 #include "BlifReader.h"
-#include "dynamatic/Support/LLVM.h"
 #include "gurobi_c++.h"
 #include <set>
 #include <string>

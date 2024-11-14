@@ -126,7 +126,7 @@ class ArithSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
   std::unordered_map<unsigned int, ChannelSignals> inputNodes;
-  ChannelSignals outputSignals;
+  ChannelSignals outputNodes;
 
 public:
   ArithSubjectGraph(Operation *op);
@@ -138,7 +138,7 @@ class CmpISubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
   std::unordered_map<unsigned int, ChannelSignals> inputNodes;
-  ChannelSignals outputSignals;
+  ChannelSignals outputNodes;
 
 public:
   CmpISubjectGraph(Operation *op);
@@ -204,7 +204,7 @@ public:
 
 class SourceSubjectGraph : public BaseSubjectGraph {
 private:
-  ChannelSignals outputSignals;
+  ChannelSignals outputNodes;
 
 public:
   SourceSubjectGraph(Operation *op);
@@ -244,7 +244,7 @@ class ConstantSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
   ChannelSignals controlSignals;
-  ChannelSignals outputSignals;
+  ChannelSignals outputNodes;
 
 public:
   ConstantSubjectGraph(Operation *op);
@@ -256,8 +256,8 @@ class ExtTruncSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int inputWidth = 0;
   unsigned int outputWidth = 0;
-  ChannelSignals inputSignals;
-  ChannelSignals outputSignals;
+  ChannelSignals inputNodes;
+  ChannelSignals outputNodes;
 
 public:
   ExtTruncSubjectGraph(Operation *op);
@@ -268,8 +268,8 @@ public:
 class SelectSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
-  std::unordered_map<unsigned int, ChannelSignals> inputSignals;
-  ChannelSignals outputSignals;
+  std::unordered_map<unsigned int, ChannelSignals> inputNodes;
+  ChannelSignals outputNodes;
 
 public:
   SelectSubjectGraph(Operation *op);
@@ -280,8 +280,8 @@ public:
 class BranchSinkSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
-  ChannelSignals inputSignals;
-  ChannelSignals outputSignals;
+  ChannelSignals inputNodes;
+  ChannelSignals outputNodes;
 
 public:
   BranchSinkSubjectGraph(Operation *op);
@@ -292,8 +292,8 @@ public:
 class BufferSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
-  ChannelSignals inputSignals;
-  ChannelSignals outputSignals;
+  ChannelSignals inputNodes;
+  ChannelSignals outputNodes;
 
 public:
   BufferSubjectGraph(Operation *op);

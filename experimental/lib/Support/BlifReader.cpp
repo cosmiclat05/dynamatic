@@ -179,9 +179,9 @@ BlifData *BlifParser::parseBlifFile(const std::string &filename) {
         fanin->addFanout(fanout);
         fanout->setFunction(line);
       } else if (currNodes.size() == 3) {
-        Node *fanout = data->createNode(currNodes.back());
         Node *fanin1 = data->createNode(currNodes[0]);
         Node *fanin2 = data->createNode(currNodes[1]);
+        Node *fanout = data->createNode(currNodes.back());
         fanout->addFanin(fanin1);
         fanout->addFanin(fanin2);
         fanin1->addFanout(fanout);

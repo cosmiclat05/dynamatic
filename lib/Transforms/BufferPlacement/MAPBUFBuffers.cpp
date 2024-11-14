@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -19,14 +20,12 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
-#include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutEnumeration.h"
 #include "experimental/Support/SubjectGraph.h"
 #include "gurobi_c.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
-#include "mlir/IR/OperationSupport.h"
 #include <boost/functional/hash/extensions.hpp>
 #include <omp.h>
 #include <string>
@@ -137,53 +136,48 @@ double getDelay(const std::map<unsigned int, double> &delayTable,
   return it != delayTable.end() ? it->second : 0.0;
 }
 
-void MAPBUFBuffers::addBlackboxConstraints() {
-  for (auto &[channel, _] : channelProps) {
-    Operation *definingOp = channel.getDefiningOp();
-    if (!definingOp) {
-      continue;
+void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
+  Operation *definingOp = channel.getDefiningOp();
+  bool isCmpi = false;
+
+  // Blackbox constraints are only added for ADDI, SUBI and CMPI operations
+  // Need a bool for CMPI as it has a different delay than ADDI and SUBI
+  llvm::TypeSwitch<Operation *, void>(definingOp)
+      .Case<handshake::AddIOp, handshake::SubIOp>(
+          [&](auto op) {})
+      .Case<handshake::CmpIOp>([&](auto op) { isCmpi = true; })
+      .Default([&](auto) { return; });
+
+  for (unsigned int i = 0; i < definingOp->getNumOperands(); i++) {
+    // Looping over the input channels of the blackbox operation
+    Value inputChannel = definingOp->getOperand(i);
+
+    // Skip mapping to blackboxes for operations with bitwidth <= 4. 
+    unsigned int bitwidth =
+        handshake::getHandshakeTypeBitWidth(inputChannel.getType());
+    if (bitwidth <= 4) {
+      break;
     }
 
-    for (unsigned int i = 0; i < definingOp->getNumOperands(); i++) {
-      bool isSubi = isOperationType(definingOp, "subi");
-      bool isAddi = isOperationType(definingOp, "addi");
-      bool isCmpi = isOperationType(definingOp, "cmpi");
-      bool isMem = isOperationType(definingOp, "mem_controller");
+    ChannelVars &inputChannelVars = vars.channelVars[inputChannel];
+    ChannelVars &outputChannelVars = vars.channelVars[channel];
 
-      if (!(isSubi || isAddi || isCmpi || isMem)) {
-        continue;
-      }
+    // Path In variable of the channel that comes after blackbox module (output of blackbox)
+    GRBVar &outputPathIn =
+        outputChannelVars.signalVars[SignalType::DATA].path.tIn;
 
-      Value inputChannel = definingOp->getOperand(i);
+    // Path Out variable of the channel that comes before blackbox module (input of blackbox)
+    GRBVar &inputPathOut =
+        inputChannelVars.signalVars[SignalType::DATA].path.tOut;
 
-      if (isMem) {
-        continue;
-      }
-
-      // Skip mapping to blackboxes for operations with bitwidth <= 4
-      unsigned int bitwidth =
-          handshake::getHandshakeTypeBitWidth(inputChannel.getType());
-      if (bitwidth <= 4) {
-        break;
-      }
-
-      ChannelVars &inputChannelVars = vars.channelVars[inputChannel];
-      ChannelVars &outputChannelVars = vars.channelVars[channel];
-
-      GRBVar &outputPathIn =
-          outputChannelVars.signalVars[SignalType::DATA].path.tIn;
-      GRBVar &inputPathOut =
-          inputChannelVars.signalVars[SignalType::DATA].path.tOut;
-
-      if (isCmpi) {
-        double delay = getDelay(COMPARATOR_DELAYS, bitwidth);
-        model.addConstr(inputPathOut + delay == outputPathIn,
-                        "cmpi_constraint_" + std::to_string(bitwidth));
-      } else { // addi or subi
-        double delay = getDelay(ADDER_DELAYS, bitwidth);
-        model.addConstr(inputPathOut + delay == outputPathIn,
-                        "adder_constraint_" + std::to_string(bitwidth));
-      }
+    if (isCmpi) {
+      double delay = getDelay(COMPARATOR_DELAYS, bitwidth);
+      model.addConstr(inputPathOut + delay == outputPathIn,
+                      "cmpi_constraint_" + std::to_string(bitwidth));
+    } else { // addi or subi
+      double delay = getDelay(ADDER_DELAYS, bitwidth);
+      model.addConstr(inputPathOut + delay == outputPathIn,
+                      "adder_constraint_" + std::to_string(bitwidth));
     }
   }
   model.update();
@@ -243,23 +237,21 @@ void MAPBUFBuffers::addCustomChannelConstraints(Value channel) {
   }
 }
 
-void MAPBUFBuffers::addCutSelectionConstraints() {
-  for (auto &[key, val] : experimental::Cuts::cuts) {
-    // Loop over each Subject Graph Node
-    GRBLinExpr cutSelectionSum = 0;
-    for (size_t i = 0; i < val.size(); ++i) {
-      // Loop over cuts of the node
-      auto &cut = val[i];
-      // Initialize the Gurobi variable for the cut selection
-      GRBVar &cutSelection = cut.getCutSelectionVariable();
-      cutSelection = model.addVar(
-          0, GRB_INFINITY, 0, GRB_BINARY,
-          (cut.getNode()->str() + "__CutSelection_" + std::to_string(i)));
-      cutSelectionSum += cutSelection;
-    }
-    model.update();
-    model.addConstr(cutSelectionSum == 1, "cut_selection_constraint");
+void MAPBUFBuffers::addCutSelectionConstraints(
+    std::vector<experimental::Cut> &cutVector) {
+  GRBLinExpr cutSelectionSum = 0;
+  for (size_t i = 0; i < cutVector.size(); ++i) {
+    // Loop over cuts of the node
+    auto &cut = cutVector[i];
+    // Initialize the Gurobi variable for the cut selection
+    GRBVar &cutSelection = cut.getCutSelectionVariable();
+    cutSelection = model.addVar(
+        0, GRB_INFINITY, 0, GRB_BINARY,
+        (cut.getNode()->str() + "__CutSelection_" + std::to_string(i)));
+    cutSelectionSum += cutSelection;
   }
+  model.update();
+  model.addConstr(cutSelectionSum == 1, "cut_selection_constraint");
 }
 
 std::vector<experimental::Node *>
@@ -611,52 +603,47 @@ void MAPBUFBuffers::connectSubjectGraphs() {
 
   // Sort the nodes of the newly created Merged BlifData in topological order
   mergedBlif->traverseNodes();
-
   blifData = mergedBlif;
 }
 
-void MAPBUFBuffers::addDelayPropagationConstraints() {
-  for (auto &rootCutPair : experimental::Cuts::cuts) {
-    // Using cuts map to loop over subject graph edges, and adds delay
-    // propagation constraints to the nodes that have cuts
-    auto *root = rootCutPair.first;
-    auto &cutVector = rootCutPair.second;
+void MAPBUFBuffers::addDelayPropagationConstraints(
+    experimental::Node *root, std::vector<experimental::Cut> &cutVector) {
+  // Using cuts map to loop over subject graph edges, and adds delay
+  // propagation constraints to the nodes that have cuts
+  GRBVar &nodeVar = root->gurobiVars->tIn;
+  std::set<experimental::Node *> fanIns = root->getFanins();
 
-    GRBVar &nodeVar = root->gurobiVars->tIn;
-    std::set<experimental::Node *> fanIns = root->getFanins();
+  if (fanIns.size() == 1) {
+    // If a node has single fanin, then it is not mapped to LUT. The
+    // delay of the node is simply equal to the delay of the fanin.
+    GRBVar &faninVar = (*fanIns.begin())->gurobiVars->tOut;
+    model.addConstr(nodeVar == faninVar, "single_fanin_delay");
+    return;
+  }
 
-    if (fanIns.size() == 1) {
-      // If a node has single fanin, then it is not mapped to LUT. The
-      // delay of the node is simply equal to the delay of the fanin.
-      GRBVar &faninVar = (*fanIns.begin())->gurobiVars->tOut;
-      model.addConstr(nodeVar == faninVar, "single_fanin_delay");
-      return;
-    }
+  for (auto &cut : cutVector) {
+    // Loop over the cuts of the subject graph edge
+    GRBVar &cutSelectionVar = cut.getCutSelectionVariable();
+    auto addDelayPropagationConstraint = [&](experimental::Node *leaf,
+                                             const char *name) {
+      GRBVar &leafVar = leaf->gurobiVars->tOut;
+      model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
+                          leafVar + lutDelay,
+                      name);
+    };
 
-    for (auto &cut : cutVector) {
-      // Loop over the cuts of the subject graph edge
-      GRBVar &cutSelectionVar = cut.getCutSelectionVariable();
-      auto addDelayPropagationConstraint = [&](experimental::Node *leaf,
-                                               const char *name) {
-        GRBVar &leafVar = leaf->gurobiVars->tOut;
-        model.addConstr(nodeVar + (1 - cutSelectionVar) * bigConstant >=
-                            leafVar + lutDelay,
-                        name);
-      };
-
-      auto& leaves = cut.getLeaves();
-      for (auto *leaf : leaves) {
-        // Loop over leaves of the cut
-        if ((leaves.size() == 1) && (leaf == root)) {
-          // Trivial cut. Delay is propagated from the fanins of the root
-          for (auto &fanIn : fanIns) {
-            addDelayPropagationConstraint(fanIn, "trivial_cut_delay");
-          }
-          continue;
+    auto &leaves = cut.getLeaves();
+    for (auto *leaf : leaves) {
+      // Loop over leaves of the cut
+      if ((leaves.size() == 1) && (leaf == root)) {
+        // Trivial cut. Delay is propagated from the fanins of the root
+        for (auto &fanIn : fanIns) {
+          addDelayPropagationConstraint(fanIn, "trivial_cut_delay");
         }
-        addDelayPropagationConstraint(leaf, "delay_propagation");
-        addCutSelectionConflicts(root, leaf, cutSelectionVar);
+        continue;
       }
+      addDelayPropagationConstraint(leaf, "delay_propagation");
+      addCutSelectionConflicts(root, leaf, cutSelectionVar);
     }
   }
 }
@@ -689,6 +676,7 @@ void MAPBUFBuffers::setup() {
     addChannelVars(channel, signals);
     addCustomChannelConstraints(channel);
     addChannelElasticityConstraints(channel, bufGroups);
+    addBlackboxConstraints(channel);
 
     for (SignalType signal : signals) {
       addClockPeriodConstraintsChannels(channel, signal);
@@ -705,7 +693,7 @@ void MAPBUFBuffers::setup() {
     addUnitElasticityConstraints(&op, channelFilter);
   }
 
-  // Call the generator class to initialize the subject graphs of the modules
+  // The generator class to initialize the subject graphs of the modules
   experimental::SubjectGraphGenerator generateSubjectGraph(funcInfo.funcOp);
 
   // boolean to choose between different acyclic graph convertion methods
@@ -724,11 +712,10 @@ void MAPBUFBuffers::setup() {
 
   addClockPeriodConstraintsNodes();
 
-  addBlackboxConstraints();
-
-  addCutSelectionConstraints();
-
-  addDelayPropagationConstraints();
+  for (auto &[rootNode, cutVector] : experimental::Cuts::cuts) {
+    addCutSelectionConstraints(cutVector);
+    addDelayPropagationConstraints(rootNode, cutVector);
+  }
 
   SmallVector<CFDFC *> cfdfcs;
   for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {

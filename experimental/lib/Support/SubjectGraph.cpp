@@ -241,7 +241,7 @@ ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->getName();
     if (nodeName.find("result") != std::string::npos) {
-      assignSignals(outputSignals, node, nodeName);
+      assignSignals(outputNodes, node, nodeName);
       node->setName(uniqueName + "_" + nodeName);
       if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
                          nodeName.find("ready") == std::string::npos)) {
@@ -265,7 +265,7 @@ void ArithSubjectGraph::connectInputNodes() {
 
 ChannelSignals &
 ArithSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
-  return outputSignals;
+  return outputNodes;
 }
 
 // CmpISubjectGraph implementation
@@ -290,7 +290,7 @@ CmpISubjectGraph::CmpISubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->getName();
     if (nodeName.find("result") != std::string::npos) {
-      assignSignals(outputSignals, node, nodeName);
+      assignSignals(outputNodes, node, nodeName);
       node->setName(uniqueName + "_" + nodeName);
       if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
                          nodeName.find("ready") == std::string::npos)) {
@@ -313,7 +313,7 @@ void CmpISubjectGraph::connectInputNodes() {
 }
 
 ChannelSignals &CmpISubjectGraph::returnOutputNodes(unsigned int channelIndex) {
-  return outputSignals;
+  return outputNodes;
 }
 
 // ForkSubjectGraph implementation
@@ -432,6 +432,7 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
             handshake::getHandshakeTypeBitWidth(muxOp.getResult().getType());
         selectType = handshake::getHandshakeTypeBitWidth(
             muxOp.getSelectOperand().getType());
+
         appendVarsToPath({size, dataWidth});
       })
       .Default([&](auto) {
@@ -610,7 +611,7 @@ SourceSubjectGraph::SourceSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->getName();
     if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputSignals, node, nodeName);
+      assignSignals(outputNodes, node, nodeName);
       node->setName(uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
       node->setName(uniqueName + "." + nodeName);
@@ -623,7 +624,7 @@ void SourceSubjectGraph::connectInputNodes() {
 }
 
 ChannelSignals &SourceSubjectGraph::returnOutputNodes(unsigned int) {
-  return outputSignals;
+  return outputNodes;
 }
 
 // LoadSubjectGraph implementation
@@ -677,6 +678,7 @@ StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
                 storeOp.getDataInput().getType());
             addrType = handshake::getHandshakeTypeBitWidth(
                 storeOp.getAddressInput().getType());
+
             appendVarsToPath({addrType, dataWidth});
           })
       .Default([&](auto) {
@@ -707,8 +709,7 @@ void StoreSubjectGraph::connectInputNodes() {
   connectInputNodesHelper(dataInSignals, inputSubjectGraphs[1]);
 }
 
-ChannelSignals &
-StoreSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
+ChannelSignals &StoreSubjectGraph::returnOutputNodes(unsigned int) {
   return addrOutSignals;
 }
 
@@ -740,7 +741,7 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
     auto nodeName = node->getName();
     if (nodeName.find("outs") != std::string::npos) {
       node->setName(uniqueName + "_" + nodeName);
-      assignSignals(outputSignals, node, nodeName);
+      assignSignals(outputNodes, node, nodeName);
     } else if (nodeName.find("ctrl") != std::string::npos) {
       assignSignals(controlSignals, node, nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
@@ -753,9 +754,8 @@ void ConstantSubjectGraph::connectInputNodes() {
   connectInputNodesHelper(controlSignals, inputSubjectGraphs[0]);
 }
 
-ChannelSignals &
-ConstantSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
-  return outputSignals;
+ChannelSignals &ConstantSubjectGraph::returnOutputNodes(unsigned int) {
+  return outputNodes;
 }
 
 // ExtTruncSubjectGraph implementation
@@ -782,9 +782,9 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
     auto nodeName = node->getName();
     if (nodeName.find("ins") != std::string::npos &&
         (node->isInput() || node->isOutput())) {
-      assignSignals(inputSignals, node, nodeName);
+      assignSignals(inputNodes, node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputSignals, node, nodeName);
+      assignSignals(outputNodes, node, nodeName);
       node->setName(uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
       node->setName(uniqueName + "." + nodeName);
@@ -793,12 +793,12 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
 }
 
 void ExtTruncSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(inputSignals, inputSubjectGraphs[0]);
+  connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
 }
 
 ChannelSignals &
 ExtTruncSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
-  return outputSignals;
+  return outputNodes;
 }
 
 // SelectSubjectGraph implementation
@@ -821,15 +821,15 @@ SelectSubjectGraph::SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
     auto nodeName = node->getName();
     if (nodeName.find("trueValue") != std::string::npos &&
         (node->isInput() || node->isOutput())) {
-      assignSignals(inputSignals[1], node, nodeName);
+      assignSignals(inputNodes[1], node, nodeName);
     } else if (nodeName.find("falseValue") != std::string::npos &&
                (node->isInput() || node->isOutput())) {
-      assignSignals(inputSignals[2], node, nodeName);
+      assignSignals(inputNodes[2], node, nodeName);
     } else if (nodeName.find("condition") != std::string::npos &&
                (node->isInput() || node->isOutput())) {
-      assignSignals(inputSignals[0], node, nodeName);
+      assignSignals(inputNodes[0], node, nodeName);
     } else if (nodeName.find("result") != std::string::npos) {
-      assignSignals(outputSignals, node, nodeName);
+      assignSignals(outputNodes, node, nodeName);
       node->setName(uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
       node->setName(uniqueName + "." + nodeName);
@@ -838,14 +838,14 @@ SelectSubjectGraph::SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 }
 
 void SelectSubjectGraph::connectInputNodes() {
-  for (unsigned int i = 0; i < inputSignals.size(); i++) {
-    connectInputNodesHelper(inputSignals[i], inputSubjectGraphs[i]);
+  for (unsigned int i = 0; i < inputNodes.size(); i++) {
+    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i]);
   }
 }
 
 ChannelSignals &
 SelectSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
-  return outputSignals;
+  return outputNodes;
 }
 
 // BranchSinkSubjectGraph implementation
@@ -874,9 +874,9 @@ BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
     auto nodeName = node->getName();
     if (nodeName.find("ins") != std::string::npos &&
         (node->isInput() || node->isOutput())) {
-      assignSignals(inputSignals, node, nodeName);
+      assignSignals(inputNodes, node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputSignals, node, nodeName);
+      assignSignals(outputNodes, node, nodeName);
       node->setName(uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos ||
                nodeName.find("dataReg") != std::string::npos) {
@@ -887,12 +887,12 @@ BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
 
 void BranchSinkSubjectGraph::connectInputNodes() {
   if (!inputModules.empty()) {
-    connectInputNodesHelper(inputSignals, inputSubjectGraphs[0]);
+    connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
   }
 }
 
 ChannelSignals &BranchSinkSubjectGraph::returnOutputNodes(unsigned int) {
-  return outputSignals;
+  return outputNodes;
 }
 
 // BufferSubjectGraph implementations
@@ -933,9 +933,9 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
     auto nodeName = node->getName();
     if (nodeName.find("ins") != std::string::npos &&
         (node->isInput() || node->isOutput())) {
-      assignSignals(inputSignals, node, nodeName);
+      assignSignals(inputNodes, node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputSignals, node, nodeName);
+      assignSignals(outputNodes, node, nodeName);
       node->setName(uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos ||
                nodeName.find("dataReg") != std::string::npos) {
@@ -981,9 +981,9 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op1, Operation *op2,
     auto nodeName = node->getName();
     if (nodeName.find("ins") != std::string::npos &&
         (node->isInput() || node->isOutput())) {
-      assignSignals(inputSignals, node, nodeName);
+      assignSignals(inputNodes, node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputSignals, node, nodeName);
+      assignSignals(outputNodes, node, nodeName);
       node->setName(uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos ||
                nodeName.find("dataReg") != std::string::npos) {
@@ -1028,9 +1028,9 @@ BufferSubjectGraph::BufferSubjectGraph(BufferSubjectGraph *graph1,
     auto nodeName = node->getName();
     if (nodeName.find("ins") != std::string::npos &&
         (node->isInput() || node->isOutput())) {
-      assignSignals(inputSignals, node, nodeName);
+      assignSignals(inputNodes, node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputSignals, node, nodeName);
+      assignSignals(outputNodes, node, nodeName);
       node->setName(uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos ||
                nodeName.find("dataReg") != std::string::npos) {
@@ -1040,11 +1040,11 @@ BufferSubjectGraph::BufferSubjectGraph(BufferSubjectGraph *graph1,
 }
 
 void BufferSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(inputSignals, inputSubjectGraphs[0]);
+  connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
 }
 
 ChannelSignals &BufferSubjectGraph::returnOutputNodes(unsigned int) {
-  return outputSignals;
+  return outputNodes;
 }
 
 // OperationDifferentiator implementation
