@@ -57,6 +57,7 @@ void BlifData::traverseUtil(Node *node, std::set<Node *> &visitedNodes) {
 }
 
 void BlifData::traverseNodes() {
+  // traverse the nodes using DFS, sorting them into topological order
   std::set<Node *> primaryInputs;
   std::set<Node *> primaryOutputs;
 

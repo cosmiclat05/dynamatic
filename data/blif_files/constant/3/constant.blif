@@ -1,0 +1,15 @@
+# Benchmark "constant" written by ABC on Sat Oct 19 00:41:30 2024
+.model constant
+.inputs clk rst ctrl_valid outs_ready
+.outputs ctrl_ready outs[0] outs[1] outs[2] outs_valid
+.names outs[0]
+ 0
+.names outs[1]
+ 0
+.names outs[2]
+ 0
+.names outs_ready ctrl_ready
+1 1
+.names ctrl_valid outs_valid
+1 1
+.end

@@ -1,0 +1,31 @@
+# Benchmark "cond_br" written by ABC on Sat Oct 19 00:41:25 2024
+.model cond_br
+.inputs clk rst data[0] data[1] data_valid condition condition_valid \
+ trueOut_ready falseOut_ready
+.outputs data_ready condition_ready trueOut[0] trueOut[1] trueOut_valid \
+ falseOut[0] falseOut[1] falseOut_valid
+.names condition falseOut_ready new_n18
+01 1
+.names condition trueOut_ready new_n19
+11 1
+.names new_n18 new_n19 new_n20
+00 1
+.names condition_valid new_n20 data_ready
+10 1
+.names data_valid new_n20 condition_ready
+10 1
+.names data_valid condition_valid new_n23
+11 1
+.names condition new_n23 trueOut_valid
+11 1
+.names condition new_n23 falseOut_valid
+01 1
+.names data[0] trueOut[0]
+1 1
+.names data[1] trueOut[1]
+1 1
+.names data[0] falseOut[0]
+1 1
+.names data[1] falseOut[1]
+1 1
+.end

@@ -1,0 +1,83 @@
+# Benchmark "merge" written by ABC on Sat Oct 19 00:53:13 2024
+.model merge
+.inputs clk rst ins[0] ins[1] ins[2] ins[3] ins[4] ins_valid[0] \
+ ins_valid[1] ins_valid[2] ins_valid[3] ins_valid[4] outs_ready
+.outputs ins_ready[0] ins_ready[1] ins_ready[2] ins_ready[3] ins_ready[4] \
+ outs outs_valid
+
+.latch        n42 tehb_inst.dataReg  0
+.latch        n47 tehb_inst.control.fullReg  0
+
+.names tehb_inst.dataReg tehb_inst.control.fullReg new_n27
+11 1
+.names ins[0] ins_valid[4] new_n28
+10 1
+.names ins[4] ins_valid[4] new_n29
+11 1
+.names new_n28 new_n29 new_n30
+00 1
+.names ins_valid[3] new_n30 new_n31
+00 1
+.names ins[3] ins_valid[3] new_n32
+11 1
+.names new_n31 new_n32 new_n33
+00 1
+.names ins_valid[2] new_n33 new_n34
+00 1
+.names ins[2] ins_valid[2] new_n35
+11 1
+.names new_n34 new_n35 new_n36
+00 1
+.names ins_valid[1] new_n36 new_n37
+00 1
+.names ins[1] ins_valid[1] new_n38
+11 1
+.names new_n37 new_n38 new_n39
+00 1
+.names ins_valid[0] new_n39 new_n40
+00 1
+.names ins[0] ins_valid[0] new_n41
+11 1
+.names new_n40 new_n41 new_n42_1
+00 1
+.names tehb_inst.control.fullReg new_n42_1 new_n43
+00 1
+.names new_n27 new_n43 outs
+00 0
+.names ins_valid[0] ins_valid[1] new_n45
+00 1
+.names ins_valid[2] ins_valid[3] new_n46
+00 1
+.names ins_valid[4] new_n46 new_n47_1
+01 1
+.names new_n45 new_n47_1 new_n48
+11 1
+.names tehb_inst.control.fullReg new_n48 outs_valid
+01 0
+.names outs_ready tehb_inst.control.fullReg new_n50
+00 1
+.names new_n48 new_n50 new_n51
+01 1
+.names tehb_inst.dataReg new_n51 new_n52
+10 1
+.names new_n42_1 new_n51 new_n53
+01 1
+.names new_n52 new_n53 new_n54
+00 1
+.names rst new_n54 n42
+00 1
+.names rst outs_ready new_n56
+00 1
+.names outs_valid new_n56 n47
+11 1
+.names tehb_inst.control.fullReg ins_ready[0]
+0 1
+.names ins_ready[0] ins_ready[1]
+1 1
+.names ins_ready[0] ins_ready[2]
+1 1
+.names ins_ready[0] ins_ready[3]
+1 1
+.names ins_ready[0] ins_ready[4]
+1 1
+.end

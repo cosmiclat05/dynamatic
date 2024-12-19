@@ -40,7 +40,7 @@ struct MILPVarsSubjectGraph {
 class Node {
 private:
   std::string name;
-  //BlifData *parent;
+  // BlifData *parent;
   bool isChannelEdge = false;
   bool isBlackboxOutput = false;
   bool isInputBool = false;
@@ -54,9 +54,11 @@ private:
   std::set<Node *> fanouts = {};
 
 public:
-  MILPVarsSubjectGraph* gurobiVars;
-  
+  MILPVarsSubjectGraph *gurobiVars;
+
   Node() = default;
+  Node(const std::string &name)
+      : name(name), gurobiVars(new MILPVarsSubjectGraph()) {}
   Node(const std::string &name, BlifData *parent)
       : name(name), gurobiVars(new MILPVarsSubjectGraph()) {}
 
@@ -116,7 +118,10 @@ public:
   bool isOutput() const { return isOutputBool; }
   bool isChannelEdgeNode() const { return isChannelEdge; }
   bool isBlackboxOutputNode() const { return isBlackboxOutput; }
-  bool isPrimaryInput() const { return (isConstOneBool || isConstZeroBool || isInputBool || isLatchOutputBool || isBlackboxOutput) ; }
+  bool isPrimaryInput() const {
+    return (isConstOneBool || isConstZeroBool || isInputBool ||
+            isLatchOutputBool || isBlackboxOutput);
+  }
   bool isPrimaryOutput() const { return (isOutputBool || isLatchInputBool); }
   bool isLatchInput() const { return isLatchInputBool; }
   bool isLatchOutput() const { return isLatchOutputBool; }
@@ -124,13 +129,17 @@ public:
   bool isConstOne() const { return isConstOneBool; }
   const std::string &getFunction() const { return function; }
 
-  std::set<Node *>& getFanins() { return fanins; }
-  std::set<Node *>& getFanouts() { return fanouts; }
+  std::set<Node *> &getFanins() { return fanins; }
+  std::set<Node *> &getFanouts() { return fanouts; }
 
   void addFanin(Node *node) { fanins.insert(node); }
   void addFanout(Node *node) { fanouts.insert(node); }
-  void addFanin(std::set<Node *>& nodes) { fanins.insert(nodes.begin(), nodes.end()); }
-  void addFanout(std::set<Node *>& nodes) { fanouts.insert(nodes.begin(), nodes.end()); }
+  void addFanin(std::set<Node *> &nodes) {
+    fanins.insert(nodes.begin(), nodes.end());
+  }
+  void addFanout(std::set<Node *> &nodes) {
+    fanouts.insert(nodes.begin(), nodes.end());
+  }
 
   bool operator==(const Node &other) const { return name == other.name; }
   bool operator==(const Node *other) const { return name == other->name; }
@@ -160,7 +169,7 @@ private:
 public:
   BlifData() = default;
 
-  void addLatch(Node *input, Node *output) { latches[input] = output;}
+  void addLatch(Node *input, Node *output) { latches[input] = output; }
 
   Node *getNodeByName(const std::string &name) {
     auto it = nodes.find(name);
@@ -188,10 +197,10 @@ public:
     }
   }
 
-  Node* addNode(Node* node) {
+  Node *addNode(Node *node) {
     static unsigned int counter = 0;
     if (nodes.find(node->getName()) != nodes.end()) {
-      if (node->isChannelEdgeNode()){
+      if (node->isChannelEdgeNode()) {
         return nodes[node->getName()];
       }
       node->setName(node->getName() + "_" + std::to_string(counter++));
@@ -220,8 +229,8 @@ public:
     return result;
   }
 
-  std::set<Node*> getChannels() {
-    std::set<Node*> result;
+  std::set<Node *> getChannels() {
+    std::set<Node *> result;
     for (const auto &pair : nodes) {
       if (pair.second->isChannelEdgeNode()) {
         result.insert(pair.second);
@@ -284,7 +293,7 @@ public:
 class BlifParser {
 public:
   BlifParser() = default;
-  experimental::BlifData* parseBlifFile(const std::string &filename);
+  experimental::BlifData *parseBlifFile(const std::string &filename);
 };
 
 } // namespace experimental

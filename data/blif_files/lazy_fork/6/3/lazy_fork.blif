@@ -1,0 +1,83 @@
+# Benchmark "lazy_fork" written by ABC on Sat Oct 19 00:46:09 2024
+.model lazy_fork
+.inputs clk rst ins[0] ins[1] ins[2] ins_valid outs_ready[0] outs_ready[1] \
+ outs_ready[2] outs_ready[3] outs_ready[4] outs_ready[5]
+.outputs ins_ready outs[0] outs[1] outs[2] outs[3] outs[4] outs[5] outs[6] \
+ outs[7] outs[8] outs[9] outs[10] outs[11] outs[12] outs[13] outs[14] \
+ outs[15] outs[16] outs[17] outs_valid[0] outs_valid[1] outs_valid[2] \
+ outs_valid[3] outs_valid[4] outs_valid[5]
+.names outs_ready[0] outs_ready[1] new_n38
+11 1
+.names outs_ready[2] new_n38 new_n39
+11 1
+.names outs_ready[3] new_n39 new_n40
+11 1
+.names outs_ready[4] new_n40 new_n41
+11 1
+.names outs_ready[5] new_n41 ins_ready
+11 1
+.names outs_ready[4] outs_ready[5] new_n43
+11 1
+.names outs_ready[2] outs_ready[3] new_n44
+11 1
+.names new_n43 new_n44 new_n45
+11 1
+.names ins_valid outs_ready[1] new_n46
+11 1
+.names new_n45 new_n46 outs_valid[0]
+11 1
+.names ins_valid outs_ready[0] new_n48
+11 1
+.names new_n45 new_n48 outs_valid[1]
+11 1
+.names ins_valid new_n43 new_n50
+11 1
+.names outs_ready[3] new_n38 new_n51
+11 1
+.names new_n50 new_n51 outs_valid[2]
+11 1
+.names new_n39 new_n50 outs_valid[3]
+11 1
+.names ins_valid outs_ready[5] new_n54
+11 1
+.names new_n40 new_n54 outs_valid[4]
+11 1
+.names ins_valid new_n41 outs_valid[5]
+11 1
+.names ins[0] outs[0]
+1 1
+.names ins[1] outs[1]
+1 1
+.names ins[2] outs[2]
+1 1
+.names ins[0] outs[3]
+1 1
+.names ins[1] outs[4]
+1 1
+.names ins[2] outs[5]
+1 1
+.names ins[0] outs[6]
+1 1
+.names ins[1] outs[7]
+1 1
+.names ins[2] outs[8]
+1 1
+.names ins[0] outs[9]
+1 1
+.names ins[1] outs[10]
+1 1
+.names ins[2] outs[11]
+1 1
+.names ins[0] outs[12]
+1 1
+.names ins[1] outs[13]
+1 1
+.names ins[2] outs[14]
+1 1
+.names ins[0] outs[15]
+1 1
+.names ins[1] outs[16]
+1 1
+.names ins[2] outs[17]
+1 1
+.end

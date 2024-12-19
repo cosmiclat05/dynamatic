@@ -25,44 +25,43 @@ using namespace dynamatic::experimental;
 void sortAndEraseCuts(std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
                                          NodePtrEqual> &cuts) {
   for (auto &[node, cutVector] : cuts) {
-    std::sort(cutVector.begin(), cutVector.end(),
-              [](Cut &a, Cut &b) {
-                // Get the sets first
-                const auto leavesA = a.getLeaves();
-                const auto leavesB = b.getLeaves();
+    std::sort(cutVector.begin(), cutVector.end(), [](Cut &a, Cut &b) {
+      // Get the sets first
+      const auto leavesA = a.getLeaves();
+      const auto leavesB = b.getLeaves();
 
-                // First compare by size
-                if (leavesA.size() != leavesB.size()) {
-                  return leavesA.size() < leavesB.size();
-                }
+      // First compare by size
+      if (leavesA.size() != leavesB.size()) {
+        return leavesA.size() < leavesB.size();
+      }
 
-                // Compare elements using set's iterators
-                auto itA = leavesA.begin();
-                auto itB = leavesB.begin();
-                while (itA != leavesA.end() && itB != leavesB.end()) {
-                  const Node *nodeA = *itA;
-                  const Node *nodeB = *itB;
+      // Compare elements using set's iterators
+      auto itA = leavesA.begin();
+      auto itB = leavesB.begin();
+      while (itA != leavesA.end() && itB != leavesB.end()) {
+        const Node *nodeA = *itA;
+        const Node *nodeB = *itB;
 
-                  // Handle null pointers
-                  if (!nodeA || !nodeB) {
-                    if (nodeA == nodeB) {
-                      ++itA;
-                      ++itB;
-                      continue;
-                    }
-                    return !nodeA;
-                  }
+        // Handle null pointers
+        if (!nodeA || !nodeB) {
+          if (nodeA == nodeB) {
+            ++itA;
+            ++itB;
+            continue;
+          }
+          return !nodeA;
+        }
 
-                  // Compare names
-                  if (nodeA->getName() != nodeB->getName()) {
-                    return nodeA->getName() < nodeB->getName();
-                  }
+        // Compare names
+        if (nodeA->getName() != nodeB->getName()) {
+          return nodeA->getName() < nodeB->getName();
+        }
 
-                  ++itA;
-                  ++itB;
-                }
-                return false; // Sets are equal
-              });
+        ++itA;
+        ++itB;
+      }
+      return false; // Sets are equal
+    });
 
     // Remove duplicates
     cutVector.erase(std::unique(cutVector.begin(), cutVector.end(),
@@ -106,7 +105,8 @@ void sortAndEraseCuts(std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
   }
 }
 
-Cuts::Cuts(BlifData *blif, int lutSize) : lutSize(lutSize), blif(blif) {
+CutManager::CutManager(BlifData *blif, int lutSize)
+    : lutSize(lutSize), blif(blif) {
   // Call the cutless algorithm, if argument is true, include channels in the
   // Primary Inputs set as well
   auto cutsWithoutChannels = cutless(false);
@@ -121,7 +121,7 @@ Cuts::Cuts(BlifData *blif, int lutSize) : lutSize(lutSize), blif(blif) {
   sortAndEraseCuts(cuts);
 };
 
-void Cuts::printCuts(const std::string &filename) {
+void CutManager::printCuts(const std::string &filename) {
   std::ofstream outFile("../mapbuf/" + filename);
   if (!outFile.is_open()) {
     llvm::errs() << "Error: Unable to open file for writing.\n";
@@ -150,7 +150,7 @@ void Cuts::printCuts(const std::string &filename) {
   outFile.close();
 }
 
-NodeToCuts Cuts::cutless(bool includeChannels) {
+NodeToCuts CutManager::cutless(bool includeChannels) {
   int n = 0;
   std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
   std::set<Node *> nextWavyLine;

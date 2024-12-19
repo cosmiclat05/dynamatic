@@ -1,0 +1,11 @@
+# Benchmark "antitokens" written by ABC on Sat Oct 19 01:02:24 2024
+.model antitokens
+.inputs clk reset pvalid1 pvalid0 generate_at1 generate_at0
+.outputs kill1 kill0 stop_valid
+.names stop_valid
+ 0
+.names generate_at1 kill1
+1 1
+.names generate_at0 kill0
+1 1
+.end

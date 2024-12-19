@@ -129,7 +129,9 @@ private:
   // Otherwise, delay is propagated from the leaves of the cut. Loops over the
   // leaves of the cut and adds delay propagation constraints for each leaf.
   // Also adds cut selection conflict constraints.
-  void addDelayPropagationConstraints(experimental::Node* root, std::vector<experimental::Cut> &cutVector);
+  void
+  addDelayPropagationConstraints(experimental::Node *root,
+                                 std::vector<experimental::Cut> &cutVector);
 
   // After initializing the individual Subject Graphs, connects the Subject
   // Graphs by connecting the input and output nodes of the adjacent modules.

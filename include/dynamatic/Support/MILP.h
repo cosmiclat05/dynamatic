@@ -85,9 +85,6 @@ public:
       state = State::FAILED_TO_OPTIMIZE;
       llvm::errs() << "Buffer placement MILP failed with status " << stat
                    << ", reason:" << getGurobiOptStatusDesc(stat) << "\n";
-
-      model.computeIIS();
-      model.write("/home/oyasar/mapbuf_external/infeasiable.ilp");
       return failure();
     }
     state = State::OPTIMIZED;

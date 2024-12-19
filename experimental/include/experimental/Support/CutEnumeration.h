@@ -31,7 +31,7 @@ public:
   Cut(Node *root, int depth = 0) : depth(depth), root(root){};
   // for trivial cuts
   Cut(Node *root, Node *leaf, int depth = 0)
-      : depth(depth), leaves({leaf}), root(root){}; 
+      : depth(depth), leaves({leaf}), root(root){};
   Cut(Node *root, std::set<Node *> leaves, int depth = 0)
       : depth(depth), leaves({leaves}), root(root){};
 
@@ -42,7 +42,7 @@ public:
 
   Node *getNode() { return root; }
 
-  std::set<Node *>& getLeaves() { return leaves; }
+  std::set<Node *> &getLeaves() { return leaves; }
 
   void addLeaves(Node *leaf) { this->leaves.insert(leaf); }
 
@@ -78,9 +78,9 @@ struct NodePtrEqual {
 using NodeToCuts =
     std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>;
 
-class Cuts {
+class CutManager {
 public:
-  Cuts(BlifData *blif, int lutSize);
+  CutManager(BlifData *blif, int lutSize);
 
   // Node to Cuts Map
   static inline NodeToCuts cuts;

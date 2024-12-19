@@ -1,0 +1,81 @@
+# Benchmark "control_merge_dataless" written by ABC on Sat Oct 19 00:54:24 2024
+.model control_merge_dataless
+.inputs clk rst ins_valid[0] ins_valid[1] ins_valid[2] ins_valid[3] \
+ ins_valid[4] ins_valid[5] outs_ready index_ready
+.outputs ins_ready[0] ins_ready[1] ins_ready[2] ins_ready[3] ins_ready[4] \
+ ins_ready[5] outs_valid index index_valid
+
+.latch        n40 fork_dataless.regBlock[0].regblock.transmitValue  1
+.latch        n45 fork_dataless.regBlock[1].regblock.transmitValue  1
+.latch        n50 tehb.dataReg  0
+.latch        n55 tehb.control.fullReg  0
+
+.names ins_valid[0] ins_valid[1] new_n32
+00 1
+.names ins_valid[2] ins_valid[3] new_n33
+00 1
+.names ins_valid[4] ins_valid[5] new_n34
+00 1
+.names new_n33 new_n34 new_n35
+11 1
+.names new_n32 new_n35 new_n36
+11 1
+.names tehb.control.fullReg new_n36 new_n37
+01 1
+.names fork_dataless.regBlock[0].regblock.transmitValue new_n37 outs_valid
+10 1
+.names tehb.dataReg tehb.control.fullReg new_n39
+11 1
+.names ins_valid[1] ins_valid[2] new_n40_1
+10 1
+.names ins_valid[3] new_n40_1 new_n41
+00 1
+.names ins_valid[4] new_n41 new_n42
+00 1
+.names ins_valid[5] new_n42 new_n43
+00 1
+.names tehb.control.fullReg new_n43 new_n44
+00 1
+.names new_n39 new_n44 index
+00 0
+.names fork_dataless.regBlock[1].regblock.transmitValue new_n37 index_valid
+10 1
+.names outs_ready fork_dataless.regBlock[0].regblock.transmitValue new_n47
+01 1
+.names index_ready fork_dataless.regBlock[1].regblock.transmitValue new_n48
+01 1
+.names new_n47 new_n48 new_n49
+00 1
+.names rst new_n49 new_n50_1
+00 1
+.names new_n37 new_n50_1 n55
+01 1
+.names new_n47 n55 n40
+01 0
+.names new_n48 n55 n45
+01 0
+.names tehb.control.fullReg new_n49 new_n54
+00 1
+.names new_n36 new_n54 new_n55_1
+01 1
+.names tehb.dataReg new_n55_1 new_n56
+10 1
+.names new_n43 new_n55_1 new_n57
+01 1
+.names new_n56 new_n57 new_n58
+00 1
+.names rst new_n58 n50
+00 1
+.names tehb.control.fullReg ins_ready[0]
+0 1
+.names ins_ready[0] ins_ready[1]
+1 1
+.names ins_ready[0] ins_ready[2]
+1 1
+.names ins_ready[0] ins_ready[3]
+1 1
+.names ins_ready[0] ins_ready[4]
+1 1
+.names ins_ready[0] ins_ready[5]
+1 1
+.end

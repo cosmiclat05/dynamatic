@@ -121,7 +121,7 @@ bool isOperationType(Operation *op, std::string_view type) {
   return getUniqueName(op).find(type) != std::string::npos;
 }
 
-const std::map<unsigned int, double> ADDER_DELAYS = {
+const std::map<unsigned int, double> ADD_SUB_DELAYS = {
     {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.6}, {16, 0.7}, {32, 1.0}};
 
 const std::map<unsigned int, double> COMPARATOR_DELAYS = {
@@ -143,8 +143,7 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
   // Blackbox constraints are only added for ADDI, SUBI and CMPI operations
   // Need a bool for CMPI as it has a different delay than ADDI and SUBI
   llvm::TypeSwitch<Operation *, void>(definingOp)
-      .Case<handshake::AddIOp, handshake::SubIOp>(
-          [&](auto op) {})
+      .Case<handshake::AddIOp, handshake::SubIOp>([&](auto op) {})
       .Case<handshake::CmpIOp>([&](auto op) { isCmpi = true; })
       .Default([&](auto) { return; });
 
@@ -152,7 +151,7 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
     // Looping over the input channels of the blackbox operation
     Value inputChannel = definingOp->getOperand(i);
 
-    // Skip mapping to blackboxes for operations with bitwidth <= 4. 
+    // Skip mapping to blackboxes for operations with bitwidth <= 4.
     unsigned int bitwidth =
         handshake::getHandshakeTypeBitWidth(inputChannel.getType());
     if (bitwidth <= 4) {
@@ -162,11 +161,13 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
     ChannelVars &inputChannelVars = vars.channelVars[inputChannel];
     ChannelVars &outputChannelVars = vars.channelVars[channel];
 
-    // Path In variable of the channel that comes after blackbox module (output of blackbox)
+    // Path In variable of the channel that comes after blackbox module (output
+    // of blackbox)
     GRBVar &outputPathIn =
         outputChannelVars.signalVars[SignalType::DATA].path.tIn;
 
-    // Path Out variable of the channel that comes before blackbox module (input of blackbox)
+    // Path Out variable of the channel that comes before blackbox module (input
+    // of blackbox)
     GRBVar &inputPathOut =
         inputChannelVars.signalVars[SignalType::DATA].path.tOut;
 
@@ -175,9 +176,9 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
       model.addConstr(inputPathOut + delay == outputPathIn,
                       "cmpi_constraint_" + std::to_string(bitwidth));
     } else { // addi or subi
-      double delay = getDelay(ADDER_DELAYS, bitwidth);
+      double delay = getDelay(ADD_SUB_DELAYS, bitwidth);
       model.addConstr(inputPathOut + delay == outputPathIn,
-                      "adder_constraint_" + std::to_string(bitwidth));
+                      "add_sub_constraint_" + std::to_string(bitwidth));
     }
   }
   model.update();
@@ -562,27 +563,6 @@ void MAPBUFBuffers::addClockPeriodConstraintsChannels(Value channel,
 }
 
 void MAPBUFBuffers::connectSubjectGraphs() {
-  // // remove br modules from subject graph
-  // for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
-  //   auto *moduleGraph = module.first;
-  //   std::string &moduleType = moduleGraph->getModuleType();
-  //   if (moduleType == "br") {
-  //     // br has one input and one output
-  //     auto brInput = moduleGraph->getInputSubjectGraphs();
-  //     auto brOutput = moduleGraph->getOutputSubjectGraphs();
-  //     experimental::BaseSubjectGraph::changeInput(brOutput[0],
-  //     brInput[0],
-  //                                                 moduleGraph);
-  //     experimental::BaseSubjectGraph::changeOutput(brInput[0],
-  //     brOutput[0],
-  //                                                  moduleGraph);
-  //   }
-  // }
-  // Create a directory named "submodules" under blifFile.str()
-  // std::string submodulesDir = blifFile.str() + "submodules";
-  // if (!std::filesystem::create_directory(submodulesDir)) {
-  //   llvm::errs() << "Failed to create directory: " << submodulesDir << "\n";
-  // }
   for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
     module.first->connectInputNodes();
   }
@@ -706,13 +686,13 @@ void MAPBUFBuffers::setup() {
 
   connectSubjectGraphs();
 
-  // Generates the cuts and saves them in the static experimental::Cuts::cuts
-  // map
-  experimental::Cuts generateCuts(blifData, 6);
+  // Generates the cuts and saves them in the static
+  // experimental::CutManager::cuts map
+  experimental::CutManager generateCuts(blifData, 6);
 
   addClockPeriodConstraintsNodes();
 
-  for (auto &[rootNode, cutVector] : experimental::Cuts::cuts) {
+  for (auto &[rootNode, cutVector] : experimental::CutManager::cuts) {
     addCutSelectionConstraints(cutVector);
     addDelayPropagationConstraints(rootNode, cutVector);
   }

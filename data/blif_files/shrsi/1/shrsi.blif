@@ -1,0 +1,13 @@
+# Benchmark "shrsi" written by ABC on Sat Oct 19 00:41:02 2024
+.model shrsi
+.inputs clk rst lhs lhs_valid rhs rhs_valid result_ready
+.outputs result result_valid lhs_ready rhs_ready
+.names lhs_valid rhs_valid result_valid
+11 1
+.names rhs_valid result_ready lhs_ready
+11 1
+.names lhs_valid result_ready rhs_ready
+11 1
+.names lhs result
+1 1
+.end

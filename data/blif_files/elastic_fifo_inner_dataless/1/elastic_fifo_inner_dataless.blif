@@ -1,0 +1,61 @@
+# Benchmark "elastic_fifo_inner_dataless" written by ABC on Sat Oct 19 00:43:54 2024
+.model elastic_fifo_inner_dataless
+.inputs clk rst ins_valid outs_ready
+.outputs ins_ready outs_valid
+
+.latch        n14      Empty  0
+.latch        n19       Full  0
+.latch        n24    Head[0]  0
+.latch        n29   Head[-1]  0
+.latch        n34    Tail[0]  0
+.latch        n39   Tail[-1]  0
+
+.names outs_ready Full ins_ready
+01 0
+.names ins_valid ins_ready new_n26
+11 1
+.names outs_ready Empty new_n27
+10 1
+.names new_n26 new_n27 new_n28
+01 1
+.names Tail[0] Tail[-1] new_n29_1
+00 1
+.names new_n28 new_n29_1 new_n30
+11 1
+.names Empty new_n26 new_n31
+10 1
+.names rst new_n31 new_n32
+00 1
+.names new_n30 new_n32 n14
+01 0
+.names Head[0] Head[-1] new_n34_1
+00 1
+.names new_n27 new_n34_1 new_n35
+01 1
+.names new_n26 new_n35 new_n36
+11 1
+.names Full new_n36 new_n37
+00 1
+.names rst new_n28 new_n38
+00 1
+.names new_n37 new_n38 n19
+01 1
+.names rst Head[0] new_n40
+01 1
+.names new_n27 new_n40 n24
+01 1
+.names rst Head[-1] new_n42
+01 1
+.names new_n27 new_n42 n29
+01 1
+.names rst Tail[0] new_n44
+01 1
+.names new_n26 new_n44 n34
+01 1
+.names rst Tail[-1] new_n46
+01 1
+.names new_n26 new_n46 n39
+01 1
+.names Empty outs_valid
+0 1
+.end

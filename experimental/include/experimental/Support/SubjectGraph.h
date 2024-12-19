@@ -1,4 +1,5 @@
-//===- SubjectGraph.h - Exp. support for MAPBUF buffer placement -------*- C++ -*-===//
+//===- SubjectGraph.h - Exp. support for MAPBUF buffer placement -------*- C++
+//-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -91,13 +92,16 @@ protected:
   DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResNum;
   DenseMap<BaseSubjectGraph *, unsigned int> outputSubjectGraphToResNum;
 
-  std::string fullPath = "/home/oyasar/full_integration/blif_files/";
+  std::string fullPath =
+      "./data/blif_files/"; // blif files are under /dynamatic/data/blif_files/
   std::string moduleType;
   std::string uniqueName;
   BlifData *blifData;
 
-  void assignSignals(ChannelSignals &signals, Node *node, const std::string &nodeName);
-  void connectInputNodesHelper(ChannelSignals &currentSignals, BaseSubjectGraph* moduleBeforeSubjectGraph);
+  void assignSignals(ChannelSignals &signals, Node *node,
+                     const std::string &nodeName);
+  void connectInputNodesHelper(ChannelSignals &currentSignals,
+                               BaseSubjectGraph *moduleBeforeSubjectGraph);
 
 public:
   BaseSubjectGraph();
@@ -105,9 +109,12 @@ public:
   BaseSubjectGraph(Operation *before, Operation *after);
 
   void replaceOpsBySubjectGraph();
-  static unsigned int getChannelNumber(BaseSubjectGraph *first, BaseSubjectGraph *second);
-  static void changeOutput(BaseSubjectGraph *graph, BaseSubjectGraph *newOutput, BaseSubjectGraph *oldOutput);
-  static void changeInput(BaseSubjectGraph *graph, BaseSubjectGraph *newInput, BaseSubjectGraph *oldInput);
+  static unsigned int getChannelNumber(BaseSubjectGraph *first,
+                                       BaseSubjectGraph *second);
+  static void changeOutput(BaseSubjectGraph *graph, BaseSubjectGraph *newOutput,
+                           BaseSubjectGraph *oldOutput);
+  static void changeInput(BaseSubjectGraph *graph, BaseSubjectGraph *newInput,
+                          BaseSubjectGraph *oldInput);
   void appendVarsToPath(std::initializer_list<unsigned int> inputs);
   void connectSignals(Node *currentSignal, Node *beforeSignal);
   BlifData *getBlifData() const;
@@ -298,7 +305,8 @@ private:
 public:
   BufferSubjectGraph(Operation *op);
   BufferSubjectGraph(Operation *op1, Operation *op2, std::string &bufferType);
-  BufferSubjectGraph(BufferSubjectGraph *graph1, Operation *op2, std::string &bufferType);
+  BufferSubjectGraph(BufferSubjectGraph *graph1, Operation *op2,
+                     std::string &bufferType);
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int) override;
 };
