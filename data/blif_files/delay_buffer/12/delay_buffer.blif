@@ -1,0 +1,117 @@
+# Benchmark "delay_buffer" written by ABC on Sat Oct 19 00:43:51 2024
+.model delay_buffer
+.inputs clk rst valid_in ready_in
+.outputs valid_out
+
+.latch        n12    regs[1]  0
+.latch        n17    regs[2]  0
+.latch        n22    regs[3]  0
+.latch        n27    regs[4]  0
+.latch        n32    regs[5]  0
+.latch        n37    regs[6]  0
+.latch        n42    regs[7]  0
+.latch        n47    regs[8]  0
+.latch        n52    regs[9]  0
+.latch        n57   regs[10]  0
+.latch        n62   regs[11]  0
+.latch        n67    regs[0]  0
+
+.names ready_in regs[1] new_n42_1
+01 1
+.names ready_in regs[0] new_n43
+11 1
+.names new_n42_1 new_n43 new_n44
+00 1
+.names rst new_n44 n12
+00 1
+.names ready_in regs[2] new_n46
+01 1
+.names ready_in regs[1] new_n47_1
+11 1
+.names new_n46 new_n47_1 new_n48
+00 1
+.names rst new_n48 n17
+00 1
+.names ready_in regs[3] new_n50
+01 1
+.names ready_in regs[2] new_n51
+11 1
+.names new_n50 new_n51 new_n52_1
+00 1
+.names rst new_n52_1 n22
+00 1
+.names ready_in regs[4] new_n54
+01 1
+.names ready_in regs[3] new_n55
+11 1
+.names new_n54 new_n55 new_n56
+00 1
+.names rst new_n56 n27
+00 1
+.names ready_in regs[5] new_n58
+01 1
+.names ready_in regs[4] new_n59
+11 1
+.names new_n58 new_n59 new_n60
+00 1
+.names rst new_n60 n32
+00 1
+.names ready_in regs[6] new_n62_1
+01 1
+.names ready_in regs[5] new_n63
+11 1
+.names new_n62_1 new_n63 new_n64
+00 1
+.names rst new_n64 n37
+00 1
+.names ready_in regs[7] new_n66
+01 1
+.names ready_in regs[6] new_n67_1
+11 1
+.names new_n66 new_n67_1 new_n68
+00 1
+.names rst new_n68 n42
+00 1
+.names ready_in regs[8] new_n70
+01 1
+.names ready_in regs[7] new_n71
+11 1
+.names new_n70 new_n71 new_n72
+00 1
+.names rst new_n72 n47
+00 1
+.names ready_in regs[9] new_n74
+01 1
+.names ready_in regs[8] new_n75
+11 1
+.names new_n74 new_n75 new_n76
+00 1
+.names rst new_n76 n52
+00 1
+.names ready_in regs[10] new_n78
+01 1
+.names ready_in regs[9] new_n79
+11 1
+.names new_n78 new_n79 new_n80
+00 1
+.names rst new_n80 n57
+00 1
+.names ready_in regs[11] new_n82
+01 1
+.names ready_in regs[10] new_n83
+11 1
+.names new_n82 new_n83 new_n84
+00 1
+.names rst new_n84 n62
+00 1
+.names rst ready_in new_n86
+00 1
+.names regs[0] new_n86 new_n87
+11 1
+.names valid_in new_n86 new_n88
+10 1
+.names new_n87 new_n88 n67
+00 0
+.names regs[11] valid_out
+1 1
+.end

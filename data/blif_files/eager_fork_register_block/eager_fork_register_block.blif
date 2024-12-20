@@ -1,0 +1,16 @@
+# Benchmark "eager_fork_register_block" written by ABC on Sat Oct 19 01:02:24 2024
+.model eager_fork_register_block
+.inputs clk rst ins_valid outs_ready backpressure
+.outputs outs_valid blockStop
+
+.latch        n16 transmitValue  1
+
+.names ins_valid transmitValue outs_valid
+11 1
+.names outs_ready transmitValue blockStop
+01 1
+.names rst backpressure new_n13
+01 1
+.names blockStop new_n13 n16
+01 0
+.end

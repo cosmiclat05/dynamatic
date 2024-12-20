@@ -1,0 +1,11 @@
+# Benchmark "extui" written by ABC on Sat Oct 19 00:57:11 2024
+.model extui
+.inputs clk rst ins[0] ins[1] ins[2] ins_valid outs_ready
+.outputs ins_ready outs outs_valid
+.names outs_ready ins_ready
+1 1
+.names ins[0] outs
+1 1
+.names ins_valid outs_valid
+1 1
+.end

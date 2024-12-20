@@ -143,9 +143,6 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
     return;
   }
 
-  // Print the name of the operation using llvm::errs
-  llvm::errs() << "Operation: " << getUniqueName(definingOp) << "\n";
-
   // Blackbox constraints are only added for ADDI, SUBI and CMPI operations
   // Need a bool for CMPI as it has a different delay than ADDI and SUBI
   if (isa<handshake::AddIOp>(definingOp) ||
@@ -158,8 +155,6 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
   }
 
   for (unsigned int i = 0; i < definingOp->getNumOperands(); i++) {
-    // Print the name of the operation using llvm::errs
-    llvm::errs() << "Operation Loop: " << getUniqueName(definingOp) << "\n";
     // Looping over the input channels of the blackbox operation
     Value inputChannel = definingOp->getOperand(i);
 

@@ -1,0 +1,96 @@
+# Benchmark "mux" written by ABC on Sat Oct 19 01:02:17 2024
+.model mux
+.inputs clk rst ins[0] ins[1] ins[2] ins_valid[0] ins_valid[1] ins_valid[2] \
+ index[0] index[1] index_valid outs_ready
+.outputs ins_ready[0] ins_ready[1] ins_ready[2] index_ready outs outs_valid
+
+.latch        n38 tehb_inst.dataReg  0
+.latch        n43 tehb_inst.control.fullReg  0
+
+.names index[1] index_valid new_n25
+01 1
+.names ins_valid[0] index[0] new_n26
+10 1
+.names new_n25 new_n26 new_n27
+11 1
+.names tehb_inst.control.fullReg new_n27 new_n28
+01 1
+.names ins_valid[0] new_n28 new_n29
+10 1
+.names rst new_n29 ins_ready[0]
+00 1
+.names ins_valid[1] index[0] new_n31
+11 1
+.names new_n25 new_n31 new_n32
+11 1
+.names tehb_inst.control.fullReg new_n32 new_n33
+01 1
+.names ins_valid[1] new_n33 new_n34
+10 1
+.names rst new_n34 ins_ready[1]
+00 1
+.names ins_valid[2] index[0] new_n36
+10 1
+.names index[1] index_valid new_n37
+11 1
+.names new_n36 new_n37 new_n38_1
+11 1
+.names tehb_inst.control.fullReg new_n38_1 new_n39
+01 1
+.names ins_valid[2] new_n39 new_n40
+10 1
+.names rst new_n40 ins_ready[2]
+00 1
+.names new_n27 new_n32 new_n42
+00 1
+.names new_n38_1 new_n42 new_n43_1
+01 1
+.names rst new_n43_1 new_n44
+00 1
+.names tehb_inst.control.fullReg new_n44 new_n45
+01 1
+.names index_valid new_n45 index_ready
+10 0
+.names tehb_inst.dataReg tehb_inst.control.fullReg new_n47
+11 1
+.names ins[0] new_n38_1 new_n48
+10 1
+.names ins[2] new_n38_1 new_n49
+11 1
+.names new_n48 new_n49 new_n50
+00 1
+.names new_n32 new_n50 new_n51
+00 1
+.names ins[1] new_n32 new_n52
+11 1
+.names new_n51 new_n52 new_n53
+00 1
+.names new_n27 new_n53 new_n54
+00 1
+.names ins[0] new_n27 new_n55
+11 1
+.names new_n54 new_n55 new_n56
+00 1
+.names rst new_n56 new_n57
+00 1
+.names tehb_inst.control.fullReg new_n57 new_n58
+01 1
+.names new_n47 new_n58 outs
+00 0
+.names tehb_inst.control.fullReg new_n44 outs_valid
+00 0
+.names outs_ready new_n45 new_n61
+01 1
+.names tehb_inst.dataReg new_n61 new_n62
+10 1
+.names new_n57 new_n61 new_n63
+11 1
+.names new_n62 new_n63 new_n64
+00 1
+.names rst new_n64 n38
+00 1
+.names rst outs_ready new_n66
+00 1
+.names outs_valid new_n66 n43
+11 1
+.end

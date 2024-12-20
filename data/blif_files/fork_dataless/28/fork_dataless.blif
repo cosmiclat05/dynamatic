@@ -1,0 +1,325 @@
+# Benchmark "fork_dataless" written by ABC on Sat Oct 19 00:41:59 2024
+.model fork_dataless
+.inputs clk rst ins_valid outs_ready[0] outs_ready[1] outs_ready[2] \
+ outs_ready[3] outs_ready[4] outs_ready[5] outs_ready[6] outs_ready[7] \
+ outs_ready[8] outs_ready[9] outs_ready[10] outs_ready[11] outs_ready[12] \
+ outs_ready[13] outs_ready[14] outs_ready[15] outs_ready[16] outs_ready[17] \
+ outs_ready[18] outs_ready[19] outs_ready[20] outs_ready[21] outs_ready[22] \
+ outs_ready[23] outs_ready[24] outs_ready[25] outs_ready[26] outs_ready[27]
+.outputs ins_ready outs_valid[0] outs_valid[1] outs_valid[2] outs_valid[3] \
+ outs_valid[4] outs_valid[5] outs_valid[6] outs_valid[7] outs_valid[8] \
+ outs_valid[9] outs_valid[10] outs_valid[11] outs_valid[12] outs_valid[13] \
+ outs_valid[14] outs_valid[15] outs_valid[16] outs_valid[17] outs_valid[18] \
+ outs_valid[19] outs_valid[20] outs_valid[21] outs_valid[22] outs_valid[23] \
+ outs_valid[24] outs_valid[25] outs_valid[26] outs_valid[27]
+
+.latch       n122 regBlock[0].regblock.transmitValue  1
+.latch       n127 regBlock[10].regblock.transmitValue  1
+.latch       n132 regBlock[11].regblock.transmitValue  1
+.latch       n137 regBlock[12].regblock.transmitValue  1
+.latch       n142 regBlock[13].regblock.transmitValue  1
+.latch       n147 regBlock[14].regblock.transmitValue  1
+.latch       n152 regBlock[15].regblock.transmitValue  1
+.latch       n157 regBlock[16].regblock.transmitValue  1
+.latch       n162 regBlock[17].regblock.transmitValue  1
+.latch       n167 regBlock[18].regblock.transmitValue  1
+.latch       n172 regBlock[19].regblock.transmitValue  1
+.latch       n177 regBlock[1].regblock.transmitValue  1
+.latch       n182 regBlock[20].regblock.transmitValue  1
+.latch       n187 regBlock[21].regblock.transmitValue  1
+.latch       n192 regBlock[22].regblock.transmitValue  1
+.latch       n197 regBlock[23].regblock.transmitValue  1
+.latch       n202 regBlock[24].regblock.transmitValue  1
+.latch       n207 regBlock[25].regblock.transmitValue  1
+.latch       n212 regBlock[26].regblock.transmitValue  1
+.latch       n217 regBlock[27].regblock.transmitValue  1
+.latch       n222 regBlock[2].regblock.transmitValue  1
+.latch       n227 regBlock[3].regblock.transmitValue  1
+.latch       n232 regBlock[4].regblock.transmitValue  1
+.latch       n237 regBlock[5].regblock.transmitValue  1
+.latch       n242 regBlock[6].regblock.transmitValue  1
+.latch       n247 regBlock[7].regblock.transmitValue  1
+.latch       n252 regBlock[8].regblock.transmitValue  1
+.latch       n257 regBlock[9].regblock.transmitValue  1
+
+.names outs_ready[16] regBlock[16].regblock.transmitValue new_n145
+01 1
+.names outs_ready[17] regBlock[17].regblock.transmitValue new_n146
+01 1
+.names outs_ready[18] regBlock[18].regblock.transmitValue new_n147_1
+01 1
+.names outs_ready[19] regBlock[19].regblock.transmitValue new_n148
+01 1
+.names outs_ready[12] regBlock[12].regblock.transmitValue new_n149
+01 1
+.names outs_ready[13] regBlock[13].regblock.transmitValue new_n150
+01 1
+.names outs_ready[14] regBlock[14].regblock.transmitValue new_n151
+01 1
+.names outs_ready[15] regBlock[15].regblock.transmitValue new_n152_1
+01 1
+.names outs_ready[24] regBlock[24].regblock.transmitValue new_n153
+01 1
+.names outs_ready[25] regBlock[25].regblock.transmitValue new_n154
+01 1
+.names outs_ready[26] regBlock[26].regblock.transmitValue new_n155
+01 1
+.names outs_ready[27] regBlock[27].regblock.transmitValue new_n156
+01 1
+.names outs_ready[20] regBlock[20].regblock.transmitValue new_n157_1
+01 1
+.names outs_ready[21] regBlock[21].regblock.transmitValue new_n158
+01 1
+.names outs_ready[22] regBlock[22].regblock.transmitValue new_n159
+01 1
+.names outs_ready[23] regBlock[23].regblock.transmitValue new_n160
+01 1
+.names outs_ready[8] regBlock[8].regblock.transmitValue new_n161
+01 1
+.names outs_ready[9] regBlock[9].regblock.transmitValue new_n162_1
+01 1
+.names outs_ready[10] regBlock[10].regblock.transmitValue new_n163
+01 1
+.names outs_ready[11] regBlock[11].regblock.transmitValue new_n164
+01 1
+.names outs_ready[4] regBlock[4].regblock.transmitValue new_n165
+01 1
+.names outs_ready[5] regBlock[5].regblock.transmitValue new_n166
+01 1
+.names outs_ready[6] regBlock[6].regblock.transmitValue new_n167_1
+01 1
+.names outs_ready[7] regBlock[7].regblock.transmitValue new_n168
+01 1
+.names outs_ready[0] regBlock[0].regblock.transmitValue new_n169
+01 1
+.names outs_ready[1] regBlock[1].regblock.transmitValue new_n170
+01 1
+.names outs_ready[2] regBlock[2].regblock.transmitValue new_n171
+01 1
+.names outs_ready[3] regBlock[3].regblock.transmitValue new_n172_1
+01 1
+.names new_n145 new_n146 new_n173
+00 1
+.names new_n147_1 new_n148 new_n174
+00 1
+.names new_n149 new_n150 new_n175
+00 1
+.names new_n151 new_n152_1 new_n176
+00 1
+.names new_n153 new_n154 new_n177_1
+00 1
+.names new_n155 new_n156 new_n178
+00 1
+.names new_n157_1 new_n158 new_n179
+00 1
+.names new_n159 new_n160 new_n180
+00 1
+.names new_n161 new_n162_1 new_n181
+00 1
+.names new_n163 new_n164 new_n182_1
+00 1
+.names new_n165 new_n166 new_n183
+00 1
+.names new_n167_1 new_n168 new_n184
+00 1
+.names new_n169 new_n170 new_n185
+00 1
+.names new_n171 new_n172_1 new_n186
+00 1
+.names new_n185 new_n186 new_n187_1
+11 1
+.names new_n183 new_n184 new_n188
+11 1
+.names new_n181 new_n182_1 new_n189
+11 1
+.names new_n179 new_n180 new_n190
+11 1
+.names new_n177_1 new_n178 new_n191
+11 1
+.names new_n175 new_n176 new_n192_1
+11 1
+.names new_n173 new_n174 new_n193
+11 1
+.names new_n192_1 new_n193 new_n194
+11 1
+.names new_n190 new_n191 new_n195
+11 1
+.names new_n188 new_n189 new_n196
+11 1
+.names new_n187_1 new_n196 new_n197_1
+11 1
+.names new_n194 new_n195 new_n198
+11 1
+.names new_n197_1 new_n198 ins_ready
+11 1
+.names ins_valid regBlock[0].regblock.transmitValue outs_valid[0]
+11 1
+.names ins_valid regBlock[1].regblock.transmitValue outs_valid[1]
+11 1
+.names ins_valid regBlock[2].regblock.transmitValue outs_valid[2]
+11 1
+.names ins_valid regBlock[3].regblock.transmitValue outs_valid[3]
+11 1
+.names ins_valid regBlock[4].regblock.transmitValue outs_valid[4]
+11 1
+.names ins_valid regBlock[5].regblock.transmitValue outs_valid[5]
+11 1
+.names ins_valid regBlock[6].regblock.transmitValue outs_valid[6]
+11 1
+.names ins_valid regBlock[7].regblock.transmitValue outs_valid[7]
+11 1
+.names ins_valid regBlock[8].regblock.transmitValue outs_valid[8]
+11 1
+.names ins_valid regBlock[9].regblock.transmitValue outs_valid[9]
+11 1
+.names ins_valid regBlock[10].regblock.transmitValue outs_valid[10]
+11 1
+.names ins_valid regBlock[11].regblock.transmitValue outs_valid[11]
+11 1
+.names ins_valid regBlock[12].regblock.transmitValue outs_valid[12]
+11 1
+.names ins_valid regBlock[13].regblock.transmitValue outs_valid[13]
+11 1
+.names ins_valid regBlock[14].regblock.transmitValue outs_valid[14]
+11 1
+.names ins_valid regBlock[15].regblock.transmitValue outs_valid[15]
+11 1
+.names ins_valid regBlock[16].regblock.transmitValue outs_valid[16]
+11 1
+.names ins_valid regBlock[17].regblock.transmitValue outs_valid[17]
+11 1
+.names ins_valid regBlock[18].regblock.transmitValue outs_valid[18]
+11 1
+.names ins_valid regBlock[19].regblock.transmitValue outs_valid[19]
+11 1
+.names ins_valid regBlock[20].regblock.transmitValue outs_valid[20]
+11 1
+.names ins_valid regBlock[21].regblock.transmitValue outs_valid[21]
+11 1
+.names ins_valid regBlock[22].regblock.transmitValue outs_valid[22]
+11 1
+.names ins_valid regBlock[23].regblock.transmitValue outs_valid[23]
+11 1
+.names ins_valid regBlock[24].regblock.transmitValue outs_valid[24]
+11 1
+.names ins_valid regBlock[25].regblock.transmitValue outs_valid[25]
+11 1
+.names ins_valid regBlock[26].regblock.transmitValue outs_valid[26]
+11 1
+.names ins_valid regBlock[27].regblock.transmitValue outs_valid[27]
+11 1
+.names ins_valid ins_ready new_n228
+10 1
+.names rst new_n169 new_n229
+00 1
+.names new_n228 new_n229 n122
+11 0
+.names rst new_n163 new_n231
+00 1
+.names new_n228 new_n231 n127
+11 0
+.names rst new_n164 new_n233
+00 1
+.names new_n228 new_n233 n132
+11 0
+.names rst new_n149 new_n235
+00 1
+.names new_n228 new_n235 n137
+11 0
+.names rst new_n150 new_n237_1
+00 1
+.names new_n228 new_n237_1 n142
+11 0
+.names rst new_n151 new_n239
+00 1
+.names new_n228 new_n239 n147
+11 0
+.names rst new_n152_1 new_n241
+00 1
+.names new_n228 new_n241 n152
+11 0
+.names rst new_n145 new_n243
+00 1
+.names new_n228 new_n243 n157
+11 0
+.names rst new_n146 new_n245
+00 1
+.names new_n228 new_n245 n162
+11 0
+.names rst new_n147_1 new_n247_1
+00 1
+.names new_n228 new_n247_1 n167
+11 0
+.names rst new_n148 new_n249
+00 1
+.names new_n228 new_n249 n172
+11 0
+.names rst new_n170 new_n251
+00 1
+.names new_n228 new_n251 n177
+11 0
+.names rst new_n157_1 new_n253
+00 1
+.names new_n228 new_n253 n182
+11 0
+.names rst new_n158 new_n255
+00 1
+.names new_n228 new_n255 n187
+11 0
+.names rst new_n159 new_n257_1
+00 1
+.names new_n228 new_n257_1 n192
+11 0
+.names rst new_n160 new_n259
+00 1
+.names new_n228 new_n259 n197
+11 0
+.names rst new_n153 new_n261
+00 1
+.names new_n228 new_n261 n202
+11 0
+.names rst new_n154 new_n263
+00 1
+.names new_n228 new_n263 n207
+11 0
+.names rst new_n155 new_n265
+00 1
+.names new_n228 new_n265 n212
+11 0
+.names rst new_n156 new_n267
+00 1
+.names new_n228 new_n267 n217
+11 0
+.names rst new_n171 new_n269
+00 1
+.names new_n228 new_n269 n222
+11 0
+.names rst new_n172_1 new_n271
+00 1
+.names new_n228 new_n271 n227
+11 0
+.names rst new_n165 new_n273
+00 1
+.names new_n228 new_n273 n232
+11 0
+.names rst new_n166 new_n275
+00 1
+.names new_n228 new_n275 n237
+11 0
+.names rst new_n167_1 new_n277
+00 1
+.names new_n228 new_n277 n242
+11 0
+.names rst new_n168 new_n279
+00 1
+.names new_n228 new_n279 n247
+11 0
+.names rst new_n161 new_n281
+00 1
+.names new_n228 new_n281 n252
+11 0
+.names rst new_n162_1 new_n283
+00 1
+.names new_n228 new_n283 n257
+11 0
+.end

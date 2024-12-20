@@ -1,0 +1,39 @@
+# Benchmark "andi" written by ABC on Sat Oct 19 00:40:46 2024
+.model andi
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs[4] lhs[5] lhs[6] lhs[7] \
+ lhs[8] lhs[9] lhs[10] lhs[11] lhs_valid rhs[0] rhs[1] rhs[2] rhs[3] rhs[4] \
+ rhs[5] rhs[6] rhs[7] rhs[8] rhs[9] rhs[10] rhs[11] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result[5] \
+ result[6] result[7] result[8] result[9] result[10] result[11] result_valid \
+ lhs_ready rhs_ready
+.names lhs[0] rhs[0] result[0]
+11 1
+.names lhs[1] rhs[1] result[1]
+11 1
+.names lhs[2] rhs[2] result[2]
+11 1
+.names lhs[3] rhs[3] result[3]
+11 1
+.names lhs[4] rhs[4] result[4]
+11 1
+.names lhs[5] rhs[5] result[5]
+11 1
+.names lhs[6] rhs[6] result[6]
+11 1
+.names lhs[7] rhs[7] result[7]
+11 1
+.names lhs[8] rhs[8] result[8]
+11 1
+.names lhs[9] rhs[9] result[9]
+11 1
+.names lhs[10] rhs[10] result[10]
+11 1
+.names lhs[11] rhs[11] result[11]
+11 1
+.names lhs_valid rhs_valid result_valid
+11 1
+.names rhs_valid result_ready lhs_ready
+11 1
+.names lhs_valid result_ready rhs_ready
+11 1
+.end

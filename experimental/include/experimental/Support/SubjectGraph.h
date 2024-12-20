@@ -92,8 +92,7 @@ protected:
   DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResNum;
   DenseMap<BaseSubjectGraph *, unsigned int> outputSubjectGraphToResNum;
 
-  std::string fullPath =
-      "./data/blif_files/"; // blif files are under /dynamatic/data/blif_files/
+  std::string fullPath = "/home/oyasar/dynamatic/data/blif_files/";
   std::string moduleType;
   std::string uniqueName;
   BlifData *blifData;

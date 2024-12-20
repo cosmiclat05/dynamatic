@@ -1,0 +1,99 @@
+# Benchmark "delay_buffer" written by ABC on Sat Oct 19 00:43:50 2024
+.model delay_buffer
+.inputs clk rst valid_in ready_in
+.outputs valid_out
+
+.latch        n12    regs[0]  0
+.latch        n17    regs[1]  0
+.latch        n22    regs[2]  0
+.latch        n27    regs[3]  0
+.latch        n32    regs[4]  0
+.latch        n37    regs[5]  0
+.latch        n42    regs[6]  0
+.latch        n47    regs[7]  0
+.latch        n52    regs[8]  0
+.latch        n57    regs[9]  0
+
+.names rst ready_in new_n36
+00 1
+.names regs[0] new_n36 new_n37_1
+11 1
+.names valid_in new_n36 new_n38
+10 1
+.names new_n37_1 new_n38 n12
+00 0
+.names ready_in regs[1] new_n40
+01 1
+.names ready_in regs[0] new_n41
+11 1
+.names new_n40 new_n41 new_n42_1
+00 1
+.names rst new_n42_1 n17
+00 1
+.names ready_in regs[2] new_n44
+01 1
+.names ready_in regs[1] new_n45
+11 1
+.names new_n44 new_n45 new_n46
+00 1
+.names rst new_n46 n22
+00 1
+.names ready_in regs[3] new_n48
+01 1
+.names ready_in regs[2] new_n49
+11 1
+.names new_n48 new_n49 new_n50
+00 1
+.names rst new_n50 n27
+00 1
+.names ready_in regs[4] new_n52_1
+01 1
+.names ready_in regs[3] new_n53
+11 1
+.names new_n52_1 new_n53 new_n54
+00 1
+.names rst new_n54 n32
+00 1
+.names ready_in regs[5] new_n56
+01 1
+.names ready_in regs[4] new_n57_1
+11 1
+.names new_n56 new_n57_1 new_n58
+00 1
+.names rst new_n58 n37
+00 1
+.names ready_in regs[6] new_n60
+01 1
+.names ready_in regs[5] new_n61
+11 1
+.names new_n60 new_n61 new_n62
+00 1
+.names rst new_n62 n42
+00 1
+.names ready_in regs[7] new_n64
+01 1
+.names ready_in regs[6] new_n65
+11 1
+.names new_n64 new_n65 new_n66
+00 1
+.names rst new_n66 n47
+00 1
+.names ready_in regs[8] new_n68
+01 1
+.names ready_in regs[7] new_n69
+11 1
+.names new_n68 new_n69 new_n70
+00 1
+.names rst new_n70 n52
+00 1
+.names ready_in regs[9] new_n72
+01 1
+.names ready_in regs[8] new_n73
+11 1
+.names new_n72 new_n73 new_n74
+00 1
+.names rst new_n74 n57
+00 1
+.names regs[9] valid_out
+1 1
+.end

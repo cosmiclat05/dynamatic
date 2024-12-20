@@ -1,0 +1,116 @@
+# Benchmark "ofifo_dataless" written by ABC on Sat Oct 19 00:42:27 2024
+.model ofifo_dataless
+.inputs clk rst ins_valid outs_ready
+.outputs ins_ready outs_valid
+
+.latch        n14 fifo.Empty  0
+.latch        n19  fifo.Full  0
+.latch        n24 fifo.Head[0]  0
+.latch        n29 fifo.Head[1]  0
+.latch        n34 fifo.Tail[0]  0
+.latch        n39 fifo.Tail[1]  0
+.latch        n44 tehb.fullReg  0
+
+.names fifo.Head[0] fifo.Tail[0] new_n28
+00 1
+.names fifo.Head[0] fifo.Tail[0] new_n29_1
+11 1
+.names new_n28 new_n29_1 new_n30
+00 1
+.names fifo.Head[0] fifo.Head[1] new_n31
+01 1
+.names fifo.Head[0] fifo.Head[1] new_n32
+10 1
+.names new_n31 new_n32 new_n33
+00 1
+.names fifo.Tail[1] new_n33 new_n34_1
+00 1
+.names fifo.Tail[1] new_n33 new_n35
+11 1
+.names ins_valid tehb.fullReg new_n36
+00 1
+.names outs_ready fifo.Full new_n37
+01 1
+.names new_n36 new_n37 new_n38
+00 1
+.names outs_ready fifo.Empty new_n39_1
+10 1
+.names new_n38 new_n39_1 new_n40
+01 1
+.names new_n30 new_n34_1 new_n41
+10 1
+.names new_n35 new_n40 new_n42
+01 1
+.names new_n41 new_n42 new_n43
+11 1
+.names fifo.Empty new_n38 new_n44_1
+10 1
+.names rst new_n44_1 new_n45
+00 1
+.names new_n43 new_n45 n14
+01 0
+.names fifo.Tail[0] fifo.Tail[1] new_n47
+01 1
+.names fifo.Tail[0] fifo.Tail[1] new_n48
+10 1
+.names new_n47 new_n48 new_n49
+00 1
+.names fifo.Head[1] new_n49 new_n50
+00 1
+.names fifo.Head[1] new_n49 new_n51
+11 1
+.names new_n30 new_n39_1 new_n52
+10 1
+.names new_n38 new_n52 new_n53
+11 1
+.names new_n50 new_n51 new_n54
+00 1
+.names new_n53 new_n54 new_n55
+11 1
+.names fifo.Full new_n55 new_n56
+00 1
+.names rst new_n40 new_n57
+00 1
+.names new_n56 new_n57 n19
+01 1
+.names fifo.Head[0] new_n39_1 new_n59
+10 1
+.names fifo.Head[0] new_n39_1 new_n60
+01 1
+.names new_n59 new_n60 new_n61
+00 1
+.names rst new_n61 n24
+00 1
+.names fifo.Head[1] new_n39_1 new_n63
+10 1
+.names new_n33 new_n39_1 new_n64
+01 1
+.names new_n63 new_n64 new_n65
+00 1
+.names rst new_n65 n29
+00 1
+.names fifo.Tail[0] new_n38 new_n67
+10 1
+.names fifo.Tail[0] new_n38 new_n68
+01 1
+.names new_n67 new_n68 new_n69
+00 1
+.names rst new_n69 n34
+00 1
+.names fifo.Tail[1] new_n38 new_n71
+10 1
+.names new_n38 new_n49 new_n72
+10 1
+.names new_n71 new_n72 new_n73
+00 1
+.names rst new_n73 n39
+00 1
+.names rst new_n36 new_n75
+00 1
+.names new_n37 new_n75 n44
+11 1
+.names tehb.fullReg ins_ready
+0 1
+.names fifo.Empty outs_valid
+0 1
+.end

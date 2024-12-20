@@ -1,0 +1,65 @@
+# Benchmark "mc_load" written by ABC on Sat Oct 19 00:47:06 2024
+.model mc_load
+.inputs clk rst addrIn addrIn_valid addrOut_ready dataFromMem \
+ dataFromMem_valid dataOut_ready
+.outputs addrIn_ready addrOut addrOut_valid dataFromMem_ready dataOut \
+ dataOut_valid
+
+.latch        n30 addr_tehb.dataReg  0
+.latch        n35 addr_tehb.control.fullReg  0
+.latch        n40 data_tehb.dataReg  0
+.latch        n45 data_tehb.control.fullReg  0
+
+.names addr_tehb.dataReg addr_tehb.control.fullReg new_n27
+11 1
+.names addrIn addr_tehb.control.fullReg new_n28
+10 1
+.names new_n27 new_n28 addrOut
+00 0
+.names addrIn_valid addr_tehb.control.fullReg addrOut_valid
+00 0
+.names data_tehb.dataReg data_tehb.control.fullReg new_n31
+11 1
+.names dataFromMem data_tehb.control.fullReg new_n32
+10 1
+.names new_n31 new_n32 dataOut
+00 0
+.names dataFromMem_valid data_tehb.control.fullReg dataOut_valid
+00 0
+.names addrIn_valid addrOut_ready new_n35_1
+10 1
+.names addr_tehb.control.fullReg new_n35_1 new_n36
+01 1
+.names addr_tehb.dataReg new_n36 new_n37
+10 1
+.names addrIn new_n36 new_n38
+11 1
+.names new_n37 new_n38 new_n39
+00 1
+.names rst new_n39 n30
+00 1
+.names rst addrOut_ready new_n41
+00 1
+.names addrOut_valid new_n41 n35
+11 1
+.names dataFromMem_valid dataOut_ready new_n43
+10 1
+.names data_tehb.control.fullReg new_n43 new_n44
+01 1
+.names data_tehb.dataReg new_n44 new_n45_1
+10 1
+.names dataFromMem new_n44 new_n46
+11 1
+.names new_n45_1 new_n46 new_n47
+00 1
+.names rst new_n47 n40
+00 1
+.names rst dataOut_ready new_n49
+00 1
+.names dataOut_valid new_n49 n45
+11 1
+.names addr_tehb.control.fullReg addrIn_ready
+0 1
+.names data_tehb.control.fullReg dataFromMem_ready
+0 1
+.end

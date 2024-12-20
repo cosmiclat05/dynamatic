@@ -1,0 +1,152 @@
+# Benchmark "merge_dataless" written by ABC on Sat Oct 19 00:42:17 2024
+.model merge_dataless
+.inputs clk rst ins_valid[0] ins_valid[1] ins_valid[2] ins_valid[3] \
+ ins_valid[4] ins_valid[5] ins_valid[6] ins_valid[7] ins_valid[8] \
+ ins_valid[9] ins_valid[10] ins_valid[11] ins_valid[12] ins_valid[13] \
+ ins_valid[14] ins_valid[15] ins_valid[16] ins_valid[17] ins_valid[18] \
+ ins_valid[19] ins_valid[20] ins_valid[21] ins_valid[22] ins_valid[23] \
+ ins_valid[24] ins_valid[25] ins_valid[26] ins_valid[27] ins_valid[28] \
+ ins_valid[29] ins_valid[30] ins_valid[31] outs_ready
+.outputs ins_ready[0] ins_ready[1] ins_ready[2] ins_ready[3] ins_ready[4] \
+ ins_ready[5] ins_ready[6] ins_ready[7] ins_ready[8] ins_ready[9] \
+ ins_ready[10] ins_ready[11] ins_ready[12] ins_ready[13] ins_ready[14] \
+ ins_ready[15] ins_ready[16] ins_ready[17] ins_ready[18] ins_ready[19] \
+ ins_ready[20] ins_ready[21] ins_ready[22] ins_ready[23] ins_ready[24] \
+ ins_ready[25] ins_ready[26] ins_ready[27] ins_ready[28] ins_ready[29] \
+ ins_ready[30] ins_ready[31] outs_valid
+
+.latch       n138 tehb.fullReg  0
+
+.names ins_valid[0] ins_valid[1] new_n72
+00 1
+.names ins_valid[2] ins_valid[3] new_n73
+00 1
+.names ins_valid[4] ins_valid[5] new_n74
+00 1
+.names ins_valid[6] ins_valid[7] new_n75
+00 1
+.names ins_valid[8] ins_valid[9] new_n76
+00 1
+.names ins_valid[10] ins_valid[11] new_n77
+00 1
+.names ins_valid[12] ins_valid[13] new_n78
+00 1
+.names ins_valid[14] ins_valid[15] new_n79
+00 1
+.names ins_valid[16] ins_valid[17] new_n80
+00 1
+.names ins_valid[18] ins_valid[19] new_n81
+00 1
+.names ins_valid[20] ins_valid[21] new_n82
+00 1
+.names ins_valid[22] ins_valid[23] new_n83
+00 1
+.names ins_valid[24] ins_valid[25] new_n84
+00 1
+.names ins_valid[26] ins_valid[27] new_n85
+00 1
+.names ins_valid[28] ins_valid[29] new_n86
+00 1
+.names ins_valid[30] ins_valid[31] new_n87
+00 1
+.names tehb.fullReg new_n87 new_n88
+01 1
+.names new_n85 new_n86 new_n89
+11 1
+.names new_n83 new_n84 new_n90
+11 1
+.names new_n81 new_n82 new_n91
+11 1
+.names new_n79 new_n80 new_n92
+11 1
+.names new_n77 new_n78 new_n93
+11 1
+.names new_n75 new_n76 new_n94
+11 1
+.names new_n73 new_n74 new_n95
+11 1
+.names new_n72 new_n95 new_n96
+11 1
+.names new_n93 new_n94 new_n97
+11 1
+.names new_n91 new_n92 new_n98
+11 1
+.names new_n89 new_n90 new_n99
+11 1
+.names new_n88 new_n99 new_n100
+11 1
+.names new_n97 new_n98 new_n101
+11 1
+.names new_n96 new_n101 new_n102
+11 1
+.names new_n100 new_n102 outs_valid
+11 0
+.names rst outs_ready new_n104
+00 1
+.names outs_valid new_n104 n138
+11 1
+.names tehb.fullReg ins_ready[0]
+0 1
+.names ins_ready[0] ins_ready[1]
+1 1
+.names ins_ready[0] ins_ready[2]
+1 1
+.names ins_ready[0] ins_ready[3]
+1 1
+.names ins_ready[0] ins_ready[4]
+1 1
+.names ins_ready[0] ins_ready[5]
+1 1
+.names ins_ready[0] ins_ready[6]
+1 1
+.names ins_ready[0] ins_ready[7]
+1 1
+.names ins_ready[0] ins_ready[8]
+1 1
+.names ins_ready[0] ins_ready[9]
+1 1
+.names ins_ready[0] ins_ready[10]
+1 1
+.names ins_ready[0] ins_ready[11]
+1 1
+.names ins_ready[0] ins_ready[12]
+1 1
+.names ins_ready[0] ins_ready[13]
+1 1
+.names ins_ready[0] ins_ready[14]
+1 1
+.names ins_ready[0] ins_ready[15]
+1 1
+.names ins_ready[0] ins_ready[16]
+1 1
+.names ins_ready[0] ins_ready[17]
+1 1
+.names ins_ready[0] ins_ready[18]
+1 1
+.names ins_ready[0] ins_ready[19]
+1 1
+.names ins_ready[0] ins_ready[20]
+1 1
+.names ins_ready[0] ins_ready[21]
+1 1
+.names ins_ready[0] ins_ready[22]
+1 1
+.names ins_ready[0] ins_ready[23]
+1 1
+.names ins_ready[0] ins_ready[24]
+1 1
+.names ins_ready[0] ins_ready[25]
+1 1
+.names ins_ready[0] ins_ready[26]
+1 1
+.names ins_ready[0] ins_ready[27]
+1 1
+.names ins_ready[0] ins_ready[28]
+1 1
+.names ins_ready[0] ins_ready[29]
+1 1
+.names ins_ready[0] ins_ready[30]
+1 1
+.names ins_ready[0] ins_ready[31]
+1 1
+.end

@@ -1,0 +1,421 @@
+# Benchmark "merge" written by ABC on Sat Oct 19 00:54:00 2024
+.model merge
+.inputs clk rst ins[0] ins[1] ins[2] ins[3] ins[4] ins[5] ins[6] ins[7] \
+ ins[8] ins[9] ins[10] ins[11] ins[12] ins[13] ins[14] ins[15] ins[16] \
+ ins[17] ins[18] ins[19] ins[20] ins[21] ins[22] ins[23] ins[24] ins[25] \
+ ins[26] ins[27] ins[28] ins[29] ins[30] ins[31] ins[32] ins[33] ins[34] \
+ ins[35] ins[36] ins[37] ins[38] ins[39] ins[40] ins[41] ins[42] ins[43] \
+ ins[44] ins[45] ins[46] ins[47] ins_valid[0] ins_valid[1] ins_valid[2] \
+ ins_valid[3] ins_valid[4] ins_valid[5] ins_valid[6] ins_valid[7] \
+ ins_valid[8] ins_valid[9] ins_valid[10] ins_valid[11] outs_ready
+.outputs ins_ready[0] ins_ready[1] ins_ready[2] ins_ready[3] ins_ready[4] \
+ ins_ready[5] ins_ready[6] ins_ready[7] ins_ready[8] ins_ready[9] \
+ ins_ready[10] ins_ready[11] outs[0] outs[1] outs[2] outs[3] outs_valid
+
+.latch       n162 tehb_inst.dataReg[0]  0
+.latch       n167 tehb_inst.dataReg[1]  0
+.latch       n172 tehb_inst.dataReg[2]  0
+.latch       n177 tehb_inst.dataReg[3]  0
+.latch       n182 tehb_inst.control.fullReg  0
+
+.names tehb_inst.dataReg[0] tehb_inst.control.fullReg new_n96
+11 1
+.names ins[0] ins_valid[11] new_n97
+10 1
+.names ins[44] ins_valid[11] new_n98
+11 1
+.names new_n97 new_n98 new_n99
+00 1
+.names ins_valid[10] new_n99 new_n100
+00 1
+.names ins[40] ins_valid[10] new_n101
+11 1
+.names new_n100 new_n101 new_n102
+00 1
+.names ins_valid[9] new_n102 new_n103
+00 1
+.names ins[36] ins_valid[9] new_n104
+11 1
+.names new_n103 new_n104 new_n105
+00 1
+.names ins_valid[8] new_n105 new_n106
+00 1
+.names ins[32] ins_valid[8] new_n107
+11 1
+.names new_n106 new_n107 new_n108
+00 1
+.names ins_valid[7] new_n108 new_n109
+00 1
+.names ins[28] ins_valid[7] new_n110
+11 1
+.names new_n109 new_n110 new_n111
+00 1
+.names ins_valid[6] new_n111 new_n112
+00 1
+.names ins[24] ins_valid[6] new_n113
+11 1
+.names new_n112 new_n113 new_n114
+00 1
+.names ins_valid[5] new_n114 new_n115
+00 1
+.names ins[20] ins_valid[5] new_n116
+11 1
+.names new_n115 new_n116 new_n117
+00 1
+.names ins_valid[4] new_n117 new_n118
+00 1
+.names ins[16] ins_valid[4] new_n119
+11 1
+.names new_n118 new_n119 new_n120
+00 1
+.names ins_valid[3] new_n120 new_n121
+00 1
+.names ins[12] ins_valid[3] new_n122
+11 1
+.names new_n121 new_n122 new_n123
+00 1
+.names ins_valid[2] new_n123 new_n124
+00 1
+.names ins[8] ins_valid[2] new_n125
+11 1
+.names new_n124 new_n125 new_n126
+00 1
+.names ins_valid[1] new_n126 new_n127
+00 1
+.names ins[4] ins_valid[1] new_n128
+11 1
+.names new_n127 new_n128 new_n129
+00 1
+.names ins_valid[0] new_n129 new_n130
+00 1
+.names ins[0] ins_valid[0] new_n131
+11 1
+.names new_n130 new_n131 new_n132
+00 1
+.names tehb_inst.control.fullReg new_n132 new_n133
+00 1
+.names new_n96 new_n133 outs[0]
+00 0
+.names tehb_inst.dataReg[1] tehb_inst.control.fullReg new_n135
+11 1
+.names ins[1] ins_valid[11] new_n136
+10 1
+.names ins[45] ins_valid[11] new_n137
+11 1
+.names new_n136 new_n137 new_n138
+00 1
+.names ins_valid[10] new_n138 new_n139
+00 1
+.names ins[41] ins_valid[10] new_n140
+11 1
+.names new_n139 new_n140 new_n141
+00 1
+.names ins_valid[9] new_n141 new_n142
+00 1
+.names ins[37] ins_valid[9] new_n143
+11 1
+.names new_n142 new_n143 new_n144
+00 1
+.names ins_valid[8] new_n144 new_n145
+00 1
+.names ins[33] ins_valid[8] new_n146
+11 1
+.names new_n145 new_n146 new_n147
+00 1
+.names ins_valid[7] new_n147 new_n148
+00 1
+.names ins[29] ins_valid[7] new_n149
+11 1
+.names new_n148 new_n149 new_n150
+00 1
+.names ins_valid[6] new_n150 new_n151
+00 1
+.names ins[25] ins_valid[6] new_n152
+11 1
+.names new_n151 new_n152 new_n153
+00 1
+.names ins_valid[5] new_n153 new_n154
+00 1
+.names ins[21] ins_valid[5] new_n155
+11 1
+.names new_n154 new_n155 new_n156
+00 1
+.names ins_valid[4] new_n156 new_n157
+00 1
+.names ins[17] ins_valid[4] new_n158
+11 1
+.names new_n157 new_n158 new_n159
+00 1
+.names ins_valid[3] new_n159 new_n160
+00 1
+.names ins[13] ins_valid[3] new_n161
+11 1
+.names new_n160 new_n161 new_n162_1
+00 1
+.names ins_valid[2] new_n162_1 new_n163
+00 1
+.names ins[9] ins_valid[2] new_n164
+11 1
+.names new_n163 new_n164 new_n165
+00 1
+.names ins_valid[1] new_n165 new_n166
+00 1
+.names ins[5] ins_valid[1] new_n167_1
+11 1
+.names new_n166 new_n167_1 new_n168
+00 1
+.names ins_valid[0] new_n168 new_n169
+00 1
+.names ins[1] ins_valid[0] new_n170
+11 1
+.names new_n169 new_n170 new_n171
+00 1
+.names tehb_inst.control.fullReg new_n171 new_n172_1
+00 1
+.names new_n135 new_n172_1 outs[1]
+00 0
+.names tehb_inst.dataReg[2] tehb_inst.control.fullReg new_n174
+11 1
+.names ins[2] ins_valid[11] new_n175
+10 1
+.names ins[46] ins_valid[11] new_n176
+11 1
+.names new_n175 new_n176 new_n177_1
+00 1
+.names ins_valid[10] new_n177_1 new_n178
+00 1
+.names ins[42] ins_valid[10] new_n179
+11 1
+.names new_n178 new_n179 new_n180
+00 1
+.names ins_valid[9] new_n180 new_n181
+00 1
+.names ins[38] ins_valid[9] new_n182_1
+11 1
+.names new_n181 new_n182_1 new_n183
+00 1
+.names ins_valid[8] new_n183 new_n184
+00 1
+.names ins[34] ins_valid[8] new_n185
+11 1
+.names new_n184 new_n185 new_n186
+00 1
+.names ins_valid[7] new_n186 new_n187
+00 1
+.names ins[30] ins_valid[7] new_n188
+11 1
+.names new_n187 new_n188 new_n189
+00 1
+.names ins_valid[6] new_n189 new_n190
+00 1
+.names ins[26] ins_valid[6] new_n191
+11 1
+.names new_n190 new_n191 new_n192
+00 1
+.names ins_valid[5] new_n192 new_n193
+00 1
+.names ins[22] ins_valid[5] new_n194
+11 1
+.names new_n193 new_n194 new_n195
+00 1
+.names ins_valid[4] new_n195 new_n196
+00 1
+.names ins[18] ins_valid[4] new_n197
+11 1
+.names new_n196 new_n197 new_n198
+00 1
+.names ins_valid[3] new_n198 new_n199
+00 1
+.names ins[14] ins_valid[3] new_n200
+11 1
+.names new_n199 new_n200 new_n201
+00 1
+.names ins_valid[2] new_n201 new_n202
+00 1
+.names ins[10] ins_valid[2] new_n203
+11 1
+.names new_n202 new_n203 new_n204
+00 1
+.names ins_valid[1] new_n204 new_n205
+00 1
+.names ins[6] ins_valid[1] new_n206
+11 1
+.names new_n205 new_n206 new_n207
+00 1
+.names ins_valid[0] new_n207 new_n208
+00 1
+.names ins[2] ins_valid[0] new_n209
+11 1
+.names new_n208 new_n209 new_n210
+00 1
+.names tehb_inst.control.fullReg new_n210 new_n211
+00 1
+.names new_n174 new_n211 outs[2]
+00 0
+.names tehb_inst.dataReg[3] tehb_inst.control.fullReg new_n213
+11 1
+.names ins[3] ins_valid[11] new_n214
+10 1
+.names ins[47] ins_valid[11] new_n215
+11 1
+.names new_n214 new_n215 new_n216
+00 1
+.names ins_valid[10] new_n216 new_n217
+00 1
+.names ins[43] ins_valid[10] new_n218
+11 1
+.names new_n217 new_n218 new_n219
+00 1
+.names ins_valid[9] new_n219 new_n220
+00 1
+.names ins[39] ins_valid[9] new_n221
+11 1
+.names new_n220 new_n221 new_n222
+00 1
+.names ins_valid[8] new_n222 new_n223
+00 1
+.names ins[35] ins_valid[8] new_n224
+11 1
+.names new_n223 new_n224 new_n225
+00 1
+.names ins_valid[7] new_n225 new_n226
+00 1
+.names ins[31] ins_valid[7] new_n227
+11 1
+.names new_n226 new_n227 new_n228
+00 1
+.names ins_valid[6] new_n228 new_n229
+00 1
+.names ins[27] ins_valid[6] new_n230
+11 1
+.names new_n229 new_n230 new_n231
+00 1
+.names ins_valid[5] new_n231 new_n232
+00 1
+.names ins[23] ins_valid[5] new_n233
+11 1
+.names new_n232 new_n233 new_n234
+00 1
+.names ins_valid[4] new_n234 new_n235
+00 1
+.names ins[19] ins_valid[4] new_n236
+11 1
+.names new_n235 new_n236 new_n237
+00 1
+.names ins_valid[3] new_n237 new_n238
+00 1
+.names ins[15] ins_valid[3] new_n239
+11 1
+.names new_n238 new_n239 new_n240
+00 1
+.names ins_valid[2] new_n240 new_n241
+00 1
+.names ins[11] ins_valid[2] new_n242
+11 1
+.names new_n241 new_n242 new_n243
+00 1
+.names ins_valid[1] new_n243 new_n244
+00 1
+.names ins[7] ins_valid[1] new_n245
+11 1
+.names new_n244 new_n245 new_n246
+00 1
+.names ins_valid[0] new_n246 new_n247
+00 1
+.names ins[3] ins_valid[0] new_n248
+11 1
+.names new_n247 new_n248 new_n249
+00 1
+.names tehb_inst.control.fullReg new_n249 new_n250
+00 1
+.names new_n213 new_n250 outs[3]
+00 0
+.names ins_valid[0] ins_valid[1] new_n252
+00 1
+.names ins_valid[2] ins_valid[3] new_n253
+00 1
+.names ins_valid[4] ins_valid[5] new_n254
+00 1
+.names ins_valid[6] ins_valid[7] new_n255
+00 1
+.names ins_valid[8] ins_valid[9] new_n256
+00 1
+.names ins_valid[10] ins_valid[11] new_n257
+00 1
+.names new_n256 new_n257 new_n258
+11 1
+.names new_n254 new_n255 new_n259
+11 1
+.names new_n252 new_n253 new_n260
+11 1
+.names new_n259 new_n260 new_n261
+11 1
+.names new_n258 new_n261 new_n262
+11 1
+.names tehb_inst.control.fullReg new_n262 outs_valid
+01 0
+.names outs_ready tehb_inst.control.fullReg new_n264
+00 1
+.names new_n262 new_n264 new_n265
+01 1
+.names tehb_inst.dataReg[0] new_n265 new_n266
+10 1
+.names new_n132 new_n265 new_n267
+01 1
+.names new_n266 new_n267 new_n268
+00 1
+.names rst new_n268 n162
+00 1
+.names tehb_inst.dataReg[1] new_n265 new_n270
+10 1
+.names new_n171 new_n265 new_n271
+01 1
+.names new_n270 new_n271 new_n272
+00 1
+.names rst new_n272 n167
+00 1
+.names tehb_inst.dataReg[2] new_n265 new_n274
+10 1
+.names new_n210 new_n265 new_n275
+01 1
+.names new_n274 new_n275 new_n276
+00 1
+.names rst new_n276 n172
+00 1
+.names tehb_inst.dataReg[3] new_n265 new_n278
+10 1
+.names new_n249 new_n265 new_n279
+01 1
+.names new_n278 new_n279 new_n280
+00 1
+.names rst new_n280 n177
+00 1
+.names rst outs_ready new_n282
+00 1
+.names outs_valid new_n282 n182
+11 1
+.names tehb_inst.control.fullReg ins_ready[0]
+0 1
+.names ins_ready[0] ins_ready[1]
+1 1
+.names ins_ready[0] ins_ready[2]
+1 1
+.names ins_ready[0] ins_ready[3]
+1 1
+.names ins_ready[0] ins_ready[4]
+1 1
+.names ins_ready[0] ins_ready[5]
+1 1
+.names ins_ready[0] ins_ready[6]
+1 1
+.names ins_ready[0] ins_ready[7]
+1 1
+.names ins_ready[0] ins_ready[8]
+1 1
+.names ins_ready[0] ins_ready[9]
+1 1
+.names ins_ready[0] ins_ready[10]
+1 1
+.names ins_ready[0] ins_ready[11]
+1 1
+.end

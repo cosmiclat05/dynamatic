@@ -1,0 +1,112 @@
+# Benchmark "xori" written by ABC on Sat Oct 19 00:41:17 2024
+.model xori
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs[4] lhs[5] lhs[6] lhs[7] \
+ lhs[8] lhs[9] lhs[10] lhs[11] lhs[12] lhs[13] lhs[14] lhs[15] lhs_valid \
+ rhs[0] rhs[1] rhs[2] rhs[3] rhs[4] rhs[5] rhs[6] rhs[7] rhs[8] rhs[9] \
+ rhs[10] rhs[11] rhs[12] rhs[13] rhs[14] rhs[15] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result[5] \
+ result[6] result[7] result[8] result[9] result[10] result[11] result[12] \
+ result[13] result[14] result[15] result_valid lhs_ready rhs_ready
+.names lhs[0] rhs[0] new_n57
+10 1
+.names lhs[0] rhs[0] new_n58
+01 1
+.names new_n57 new_n58 result[0]
+00 0
+.names lhs[1] rhs[1] new_n60
+10 1
+.names lhs[1] rhs[1] new_n61
+01 1
+.names new_n60 new_n61 result[1]
+00 0
+.names lhs[2] rhs[2] new_n63
+10 1
+.names lhs[2] rhs[2] new_n64
+01 1
+.names new_n63 new_n64 result[2]
+00 0
+.names lhs[3] rhs[3] new_n66
+10 1
+.names lhs[3] rhs[3] new_n67
+01 1
+.names new_n66 new_n67 result[3]
+00 0
+.names lhs[4] rhs[4] new_n69
+10 1
+.names lhs[4] rhs[4] new_n70
+01 1
+.names new_n69 new_n70 result[4]
+00 0
+.names lhs[5] rhs[5] new_n72
+10 1
+.names lhs[5] rhs[5] new_n73
+01 1
+.names new_n72 new_n73 result[5]
+00 0
+.names lhs[6] rhs[6] new_n75
+10 1
+.names lhs[6] rhs[6] new_n76
+01 1
+.names new_n75 new_n76 result[6]
+00 0
+.names lhs[7] rhs[7] new_n78
+10 1
+.names lhs[7] rhs[7] new_n79
+01 1
+.names new_n78 new_n79 result[7]
+00 0
+.names lhs[8] rhs[8] new_n81
+10 1
+.names lhs[8] rhs[8] new_n82
+01 1
+.names new_n81 new_n82 result[8]
+00 0
+.names lhs[9] rhs[9] new_n84
+10 1
+.names lhs[9] rhs[9] new_n85
+01 1
+.names new_n84 new_n85 result[9]
+00 0
+.names lhs[10] rhs[10] new_n87
+10 1
+.names lhs[10] rhs[10] new_n88
+01 1
+.names new_n87 new_n88 result[10]
+00 0
+.names lhs[11] rhs[11] new_n90
+10 1
+.names lhs[11] rhs[11] new_n91
+01 1
+.names new_n90 new_n91 result[11]
+00 0
+.names lhs[12] rhs[12] new_n93
+10 1
+.names lhs[12] rhs[12] new_n94
+01 1
+.names new_n93 new_n94 result[12]
+00 0
+.names lhs[13] rhs[13] new_n96
+10 1
+.names lhs[13] rhs[13] new_n97
+01 1
+.names new_n96 new_n97 result[13]
+00 0
+.names lhs[14] rhs[14] new_n99
+10 1
+.names lhs[14] rhs[14] new_n100
+01 1
+.names new_n99 new_n100 result[14]
+00 0
+.names lhs[15] rhs[15] new_n102
+10 1
+.names lhs[15] rhs[15] new_n103
+01 1
+.names new_n102 new_n103 result[15]
+00 0
+.names lhs_valid rhs_valid result_valid
+11 1
+.names rhs_valid result_ready lhs_ready
+11 1
+.names lhs_valid result_ready rhs_ready
+11 1
+.end

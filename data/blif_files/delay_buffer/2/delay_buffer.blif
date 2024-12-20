@@ -1,0 +1,27 @@
+# Benchmark "delay_buffer" written by ABC on Sat Oct 19 00:43:49 2024
+.model delay_buffer
+.inputs clk rst valid_in ready_in
+.outputs valid_out
+
+.latch        n12    regs[1]  0
+.latch        n17    regs[0]  0
+
+.names ready_in regs[1] new_n12_1
+01 1
+.names ready_in regs[0] new_n13
+11 1
+.names new_n12_1 new_n13 new_n14
+00 1
+.names rst new_n14 n12
+00 1
+.names rst ready_in new_n16
+00 1
+.names regs[0] new_n16 new_n17_1
+11 1
+.names valid_in new_n16 new_n18
+10 1
+.names new_n17_1 new_n18 n17
+00 0
+.names regs[1] valid_out
+1 1
+.end

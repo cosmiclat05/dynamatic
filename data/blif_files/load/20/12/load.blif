@@ -1,0 +1,525 @@
+# Benchmark "mc_load" written by ABC on Sat Oct 19 00:48:57 2024
+.model mc_load
+.inputs clk rst addrIn[0] addrIn[1] addrIn[2] addrIn[3] addrIn[4] addrIn[5] \
+ addrIn[6] addrIn[7] addrIn[8] addrIn[9] addrIn[10] addrIn[11] addrIn[12] \
+ addrIn[13] addrIn[14] addrIn[15] addrIn[16] addrIn[17] addrIn[18] \
+ addrIn[19] addrIn_valid addrOut_ready dataFromMem[0] dataFromMem[1] \
+ dataFromMem[2] dataFromMem[3] dataFromMem[4] dataFromMem[5] dataFromMem[6] \
+ dataFromMem[7] dataFromMem[8] dataFromMem[9] dataFromMem[10] \
+ dataFromMem[11] dataFromMem_valid dataOut_ready
+.outputs addrIn_ready addrOut[0] addrOut[1] addrOut[2] addrOut[3] \
+ addrOut[4] addrOut[5] addrOut[6] addrOut[7] addrOut[8] addrOut[9] \
+ addrOut[10] addrOut[11] addrOut[12] addrOut[13] addrOut[14] addrOut[15] \
+ addrOut[16] addrOut[17] addrOut[18] addrOut[19] addrOut_valid \
+ dataFromMem_ready dataOut[0] dataOut[1] dataOut[2] dataOut[3] dataOut[4] \
+ dataOut[5] dataOut[6] dataOut[7] dataOut[8] dataOut[9] dataOut[10] \
+ dataOut[11] dataOut_valid
+
+.latch       n150 addr_tehb.dataReg[0]  0
+.latch       n155 addr_tehb.dataReg[1]  0
+.latch       n160 addr_tehb.dataReg[2]  0
+.latch       n165 addr_tehb.dataReg[3]  0
+.latch       n170 addr_tehb.dataReg[4]  0
+.latch       n175 addr_tehb.dataReg[5]  0
+.latch       n180 addr_tehb.dataReg[6]  0
+.latch       n185 addr_tehb.dataReg[7]  0
+.latch       n190 addr_tehb.dataReg[8]  0
+.latch       n195 addr_tehb.dataReg[9]  0
+.latch       n200 addr_tehb.dataReg[10]  0
+.latch       n205 addr_tehb.dataReg[11]  0
+.latch       n210 addr_tehb.dataReg[12]  0
+.latch       n215 addr_tehb.dataReg[13]  0
+.latch       n220 addr_tehb.dataReg[14]  0
+.latch       n225 addr_tehb.dataReg[15]  0
+.latch       n230 addr_tehb.dataReg[16]  0
+.latch       n235 addr_tehb.dataReg[17]  0
+.latch       n240 addr_tehb.dataReg[18]  0
+.latch       n245 addr_tehb.dataReg[19]  0
+.latch       n250 addr_tehb.control.fullReg  0
+.latch       n255 data_tehb.dataReg[0]  0
+.latch       n260 data_tehb.dataReg[1]  0
+.latch       n265 data_tehb.dataReg[2]  0
+.latch       n270 data_tehb.dataReg[3]  0
+.latch       n275 data_tehb.dataReg[4]  0
+.latch       n280 data_tehb.dataReg[5]  0
+.latch       n285 data_tehb.dataReg[6]  0
+.latch       n290 data_tehb.dataReg[7]  0
+.latch       n295 data_tehb.dataReg[8]  0
+.latch       n300 data_tehb.dataReg[9]  0
+.latch       n305 data_tehb.dataReg[10]  0
+.latch       n310 data_tehb.dataReg[11]  0
+.latch       n315 data_tehb.control.fullReg  0
+
+.names addr_tehb.dataReg[0] addr_tehb.control.fullReg new_n177
+11 1
+.names addrIn[0] addr_tehb.control.fullReg new_n178
+10 1
+.names new_n177 new_n178 addrOut[0]
+00 0
+.names addr_tehb.dataReg[1] addr_tehb.control.fullReg new_n180_1
+11 1
+.names addrIn[1] addr_tehb.control.fullReg new_n181
+10 1
+.names new_n180_1 new_n181 addrOut[1]
+00 0
+.names addr_tehb.dataReg[2] addr_tehb.control.fullReg new_n183
+11 1
+.names addrIn[2] addr_tehb.control.fullReg new_n184
+10 1
+.names new_n183 new_n184 addrOut[2]
+00 0
+.names addr_tehb.dataReg[3] addr_tehb.control.fullReg new_n186
+11 1
+.names addrIn[3] addr_tehb.control.fullReg new_n187
+10 1
+.names new_n186 new_n187 addrOut[3]
+00 0
+.names addr_tehb.dataReg[4] addr_tehb.control.fullReg new_n189
+11 1
+.names addrIn[4] addr_tehb.control.fullReg new_n190_1
+10 1
+.names new_n189 new_n190_1 addrOut[4]
+00 0
+.names addr_tehb.dataReg[5] addr_tehb.control.fullReg new_n192
+11 1
+.names addrIn[5] addr_tehb.control.fullReg new_n193
+10 1
+.names new_n192 new_n193 addrOut[5]
+00 0
+.names addr_tehb.dataReg[6] addr_tehb.control.fullReg new_n195_1
+11 1
+.names addrIn[6] addr_tehb.control.fullReg new_n196
+10 1
+.names new_n195_1 new_n196 addrOut[6]
+00 0
+.names addr_tehb.dataReg[7] addr_tehb.control.fullReg new_n198
+11 1
+.names addrIn[7] addr_tehb.control.fullReg new_n199
+10 1
+.names new_n198 new_n199 addrOut[7]
+00 0
+.names addr_tehb.dataReg[8] addr_tehb.control.fullReg new_n201
+11 1
+.names addrIn[8] addr_tehb.control.fullReg new_n202
+10 1
+.names new_n201 new_n202 addrOut[8]
+00 0
+.names addr_tehb.dataReg[9] addr_tehb.control.fullReg new_n204
+11 1
+.names addrIn[9] addr_tehb.control.fullReg new_n205_1
+10 1
+.names new_n204 new_n205_1 addrOut[9]
+00 0
+.names addr_tehb.dataReg[10] addr_tehb.control.fullReg new_n207
+11 1
+.names addrIn[10] addr_tehb.control.fullReg new_n208
+10 1
+.names new_n207 new_n208 addrOut[10]
+00 0
+.names addr_tehb.dataReg[11] addr_tehb.control.fullReg new_n210_1
+11 1
+.names addrIn[11] addr_tehb.control.fullReg new_n211
+10 1
+.names new_n210_1 new_n211 addrOut[11]
+00 0
+.names addr_tehb.dataReg[12] addr_tehb.control.fullReg new_n213
+11 1
+.names addrIn[12] addr_tehb.control.fullReg new_n214
+10 1
+.names new_n213 new_n214 addrOut[12]
+00 0
+.names addr_tehb.dataReg[13] addr_tehb.control.fullReg new_n216
+11 1
+.names addrIn[13] addr_tehb.control.fullReg new_n217
+10 1
+.names new_n216 new_n217 addrOut[13]
+00 0
+.names addr_tehb.dataReg[14] addr_tehb.control.fullReg new_n219
+11 1
+.names addrIn[14] addr_tehb.control.fullReg new_n220_1
+10 1
+.names new_n219 new_n220_1 addrOut[14]
+00 0
+.names addr_tehb.dataReg[15] addr_tehb.control.fullReg new_n222
+11 1
+.names addrIn[15] addr_tehb.control.fullReg new_n223
+10 1
+.names new_n222 new_n223 addrOut[15]
+00 0
+.names addr_tehb.dataReg[16] addr_tehb.control.fullReg new_n225_1
+11 1
+.names addrIn[16] addr_tehb.control.fullReg new_n226
+10 1
+.names new_n225_1 new_n226 addrOut[16]
+00 0
+.names addr_tehb.dataReg[17] addr_tehb.control.fullReg new_n228
+11 1
+.names addrIn[17] addr_tehb.control.fullReg new_n229
+10 1
+.names new_n228 new_n229 addrOut[17]
+00 0
+.names addr_tehb.dataReg[18] addr_tehb.control.fullReg new_n231
+11 1
+.names addrIn[18] addr_tehb.control.fullReg new_n232
+10 1
+.names new_n231 new_n232 addrOut[18]
+00 0
+.names addr_tehb.dataReg[19] addr_tehb.control.fullReg new_n234
+11 1
+.names addrIn[19] addr_tehb.control.fullReg new_n235_1
+10 1
+.names new_n234 new_n235_1 addrOut[19]
+00 0
+.names addrIn_valid addr_tehb.control.fullReg addrOut_valid
+00 0
+.names data_tehb.dataReg[0] data_tehb.control.fullReg new_n238
+11 1
+.names dataFromMem[0] data_tehb.control.fullReg new_n239
+10 1
+.names new_n238 new_n239 dataOut[0]
+00 0
+.names data_tehb.dataReg[1] data_tehb.control.fullReg new_n241
+11 1
+.names dataFromMem[1] data_tehb.control.fullReg new_n242
+10 1
+.names new_n241 new_n242 dataOut[1]
+00 0
+.names data_tehb.dataReg[2] data_tehb.control.fullReg new_n244
+11 1
+.names dataFromMem[2] data_tehb.control.fullReg new_n245_1
+10 1
+.names new_n244 new_n245_1 dataOut[2]
+00 0
+.names data_tehb.dataReg[3] data_tehb.control.fullReg new_n247
+11 1
+.names dataFromMem[3] data_tehb.control.fullReg new_n248
+10 1
+.names new_n247 new_n248 dataOut[3]
+00 0
+.names data_tehb.dataReg[4] data_tehb.control.fullReg new_n250_1
+11 1
+.names dataFromMem[4] data_tehb.control.fullReg new_n251
+10 1
+.names new_n250_1 new_n251 dataOut[4]
+00 0
+.names data_tehb.dataReg[5] data_tehb.control.fullReg new_n253
+11 1
+.names dataFromMem[5] data_tehb.control.fullReg new_n254
+10 1
+.names new_n253 new_n254 dataOut[5]
+00 0
+.names data_tehb.dataReg[6] data_tehb.control.fullReg new_n256
+11 1
+.names dataFromMem[6] data_tehb.control.fullReg new_n257
+10 1
+.names new_n256 new_n257 dataOut[6]
+00 0
+.names data_tehb.dataReg[7] data_tehb.control.fullReg new_n259
+11 1
+.names dataFromMem[7] data_tehb.control.fullReg new_n260_1
+10 1
+.names new_n259 new_n260_1 dataOut[7]
+00 0
+.names data_tehb.dataReg[8] data_tehb.control.fullReg new_n262
+11 1
+.names dataFromMem[8] data_tehb.control.fullReg new_n263
+10 1
+.names new_n262 new_n263 dataOut[8]
+00 0
+.names data_tehb.dataReg[9] data_tehb.control.fullReg new_n265_1
+11 1
+.names dataFromMem[9] data_tehb.control.fullReg new_n266
+10 1
+.names new_n265_1 new_n266 dataOut[9]
+00 0
+.names data_tehb.dataReg[10] data_tehb.control.fullReg new_n268
+11 1
+.names dataFromMem[10] data_tehb.control.fullReg new_n269
+10 1
+.names new_n268 new_n269 dataOut[10]
+00 0
+.names data_tehb.dataReg[11] data_tehb.control.fullReg new_n271
+11 1
+.names dataFromMem[11] data_tehb.control.fullReg new_n272
+10 1
+.names new_n271 new_n272 dataOut[11]
+00 0
+.names dataFromMem_valid data_tehb.control.fullReg dataOut_valid
+00 0
+.names addrIn_valid addrOut_ready new_n275_1
+10 1
+.names addr_tehb.control.fullReg new_n275_1 new_n276
+01 1
+.names addr_tehb.dataReg[0] new_n276 new_n277
+10 1
+.names addrIn[0] new_n276 new_n278
+11 1
+.names new_n277 new_n278 new_n279
+00 1
+.names rst new_n279 n150
+00 1
+.names addr_tehb.dataReg[1] new_n276 new_n281
+10 1
+.names addrIn[1] new_n276 new_n282
+11 1
+.names new_n281 new_n282 new_n283
+00 1
+.names rst new_n283 n155
+00 1
+.names addr_tehb.dataReg[2] new_n276 new_n285_1
+10 1
+.names addrIn[2] new_n276 new_n286
+11 1
+.names new_n285_1 new_n286 new_n287
+00 1
+.names rst new_n287 n160
+00 1
+.names addr_tehb.dataReg[3] new_n276 new_n289
+10 1
+.names addrIn[3] new_n276 new_n290_1
+11 1
+.names new_n289 new_n290_1 new_n291
+00 1
+.names rst new_n291 n165
+00 1
+.names addr_tehb.dataReg[4] new_n276 new_n293
+10 1
+.names addrIn[4] new_n276 new_n294
+11 1
+.names new_n293 new_n294 new_n295_1
+00 1
+.names rst new_n295_1 n170
+00 1
+.names addr_tehb.dataReg[5] new_n276 new_n297
+10 1
+.names addrIn[5] new_n276 new_n298
+11 1
+.names new_n297 new_n298 new_n299
+00 1
+.names rst new_n299 n175
+00 1
+.names addr_tehb.dataReg[6] new_n276 new_n301
+10 1
+.names addrIn[6] new_n276 new_n302
+11 1
+.names new_n301 new_n302 new_n303
+00 1
+.names rst new_n303 n180
+00 1
+.names addr_tehb.dataReg[7] new_n276 new_n305_1
+10 1
+.names addrIn[7] new_n276 new_n306
+11 1
+.names new_n305_1 new_n306 new_n307
+00 1
+.names rst new_n307 n185
+00 1
+.names addr_tehb.dataReg[8] new_n276 new_n309
+10 1
+.names addrIn[8] new_n276 new_n310_1
+11 1
+.names new_n309 new_n310_1 new_n311
+00 1
+.names rst new_n311 n190
+00 1
+.names addr_tehb.dataReg[9] new_n276 new_n313
+10 1
+.names addrIn[9] new_n276 new_n314
+11 1
+.names new_n313 new_n314 new_n315_1
+00 1
+.names rst new_n315_1 n195
+00 1
+.names addr_tehb.dataReg[10] new_n276 new_n317
+10 1
+.names addrIn[10] new_n276 new_n318
+11 1
+.names new_n317 new_n318 new_n319
+00 1
+.names rst new_n319 n200
+00 1
+.names addr_tehb.dataReg[11] new_n276 new_n321
+10 1
+.names addrIn[11] new_n276 new_n322
+11 1
+.names new_n321 new_n322 new_n323
+00 1
+.names rst new_n323 n205
+00 1
+.names addr_tehb.dataReg[12] new_n276 new_n325
+10 1
+.names addrIn[12] new_n276 new_n326
+11 1
+.names new_n325 new_n326 new_n327
+00 1
+.names rst new_n327 n210
+00 1
+.names addr_tehb.dataReg[13] new_n276 new_n329
+10 1
+.names addrIn[13] new_n276 new_n330
+11 1
+.names new_n329 new_n330 new_n331
+00 1
+.names rst new_n331 n215
+00 1
+.names addr_tehb.dataReg[14] new_n276 new_n333
+10 1
+.names addrIn[14] new_n276 new_n334
+11 1
+.names new_n333 new_n334 new_n335
+00 1
+.names rst new_n335 n220
+00 1
+.names addr_tehb.dataReg[15] new_n276 new_n337
+10 1
+.names addrIn[15] new_n276 new_n338
+11 1
+.names new_n337 new_n338 new_n339
+00 1
+.names rst new_n339 n225
+00 1
+.names addr_tehb.dataReg[16] new_n276 new_n341
+10 1
+.names addrIn[16] new_n276 new_n342
+11 1
+.names new_n341 new_n342 new_n343
+00 1
+.names rst new_n343 n230
+00 1
+.names addr_tehb.dataReg[17] new_n276 new_n345
+10 1
+.names addrIn[17] new_n276 new_n346
+11 1
+.names new_n345 new_n346 new_n347
+00 1
+.names rst new_n347 n235
+00 1
+.names addr_tehb.dataReg[18] new_n276 new_n349
+10 1
+.names addrIn[18] new_n276 new_n350
+11 1
+.names new_n349 new_n350 new_n351
+00 1
+.names rst new_n351 n240
+00 1
+.names addr_tehb.dataReg[19] new_n276 new_n353
+10 1
+.names addrIn[19] new_n276 new_n354
+11 1
+.names new_n353 new_n354 new_n355
+00 1
+.names rst new_n355 n245
+00 1
+.names rst addrOut_ready new_n357
+00 1
+.names addrOut_valid new_n357 n250
+11 1
+.names dataFromMem_valid dataOut_ready new_n359
+10 1
+.names data_tehb.control.fullReg new_n359 new_n360
+01 1
+.names data_tehb.dataReg[0] new_n360 new_n361
+10 1
+.names dataFromMem[0] new_n360 new_n362
+11 1
+.names new_n361 new_n362 new_n363
+00 1
+.names rst new_n363 n255
+00 1
+.names data_tehb.dataReg[1] new_n360 new_n365
+10 1
+.names dataFromMem[1] new_n360 new_n366
+11 1
+.names new_n365 new_n366 new_n367
+00 1
+.names rst new_n367 n260
+00 1
+.names data_tehb.dataReg[2] new_n360 new_n369
+10 1
+.names dataFromMem[2] new_n360 new_n370
+11 1
+.names new_n369 new_n370 new_n371
+00 1
+.names rst new_n371 n265
+00 1
+.names data_tehb.dataReg[3] new_n360 new_n373
+10 1
+.names dataFromMem[3] new_n360 new_n374
+11 1
+.names new_n373 new_n374 new_n375
+00 1
+.names rst new_n375 n270
+00 1
+.names data_tehb.dataReg[4] new_n360 new_n377
+10 1
+.names dataFromMem[4] new_n360 new_n378
+11 1
+.names new_n377 new_n378 new_n379
+00 1
+.names rst new_n379 n275
+00 1
+.names data_tehb.dataReg[5] new_n360 new_n381
+10 1
+.names dataFromMem[5] new_n360 new_n382
+11 1
+.names new_n381 new_n382 new_n383
+00 1
+.names rst new_n383 n280
+00 1
+.names data_tehb.dataReg[6] new_n360 new_n385
+10 1
+.names dataFromMem[6] new_n360 new_n386
+11 1
+.names new_n385 new_n386 new_n387
+00 1
+.names rst new_n387 n285
+00 1
+.names data_tehb.dataReg[7] new_n360 new_n389
+10 1
+.names dataFromMem[7] new_n360 new_n390
+11 1
+.names new_n389 new_n390 new_n391
+00 1
+.names rst new_n391 n290
+00 1
+.names data_tehb.dataReg[8] new_n360 new_n393
+10 1
+.names dataFromMem[8] new_n360 new_n394
+11 1
+.names new_n393 new_n394 new_n395
+00 1
+.names rst new_n395 n295
+00 1
+.names data_tehb.dataReg[9] new_n360 new_n397
+10 1
+.names dataFromMem[9] new_n360 new_n398
+11 1
+.names new_n397 new_n398 new_n399
+00 1
+.names rst new_n399 n300
+00 1
+.names data_tehb.dataReg[10] new_n360 new_n401
+10 1
+.names dataFromMem[10] new_n360 new_n402
+11 1
+.names new_n401 new_n402 new_n403
+00 1
+.names rst new_n403 n305
+00 1
+.names data_tehb.dataReg[11] new_n360 new_n405
+10 1
+.names dataFromMem[11] new_n360 new_n406
+11 1
+.names new_n405 new_n406 new_n407
+00 1
+.names rst new_n407 n310
+00 1
+.names rst dataOut_ready new_n409
+00 1
+.names dataOut_valid new_n409 n315
+11 1
+.names addr_tehb.control.fullReg addrIn_ready
+0 1
+.names data_tehb.control.fullReg dataFromMem_ready
+0 1
+.end

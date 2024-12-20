@@ -1,0 +1,62 @@
+# Benchmark "oehb" written by ABC on Sat Oct 19 00:41:40 2024
+.model oehb
+.inputs clk rst ins[0] ins[1] ins[2] ins[3] ins_valid outs_ready
+.outputs ins_ready outs[0] outs[1] outs[2] outs[3] outs_valid
+
+.latch        n30 dataReg[0]  0
+.latch        n35 dataReg[1]  0
+.latch        n40 dataReg[2]  0
+.latch        n45 dataReg[3]  0
+.latch        n50 control.outputValid  0
+
+.names outs_ready control.outputValid ins_ready
+01 0
+.names ins_valid ins_ready new_n31
+11 1
+.names dataReg[0] new_n31 new_n32
+10 1
+.names ins[0] new_n31 new_n33
+11 1
+.names new_n32 new_n33 new_n34
+00 1
+.names rst new_n34 n30
+00 1
+.names dataReg[1] new_n31 new_n36
+10 1
+.names ins[1] new_n31 new_n37
+11 1
+.names new_n36 new_n37 new_n38
+00 1
+.names rst new_n38 n35
+00 1
+.names dataReg[2] new_n31 new_n40_1
+10 1
+.names ins[2] new_n31 new_n41
+11 1
+.names new_n40_1 new_n41 new_n42
+00 1
+.names rst new_n42 n40
+00 1
+.names dataReg[3] new_n31 new_n44
+10 1
+.names ins[3] new_n31 new_n45_1
+11 1
+.names new_n44 new_n45_1 new_n46
+00 1
+.names rst new_n46 n45
+00 1
+.names ins_valid ins_ready new_n48
+01 1
+.names rst new_n48 n50
+00 1
+.names dataReg[0] outs[0]
+1 1
+.names dataReg[1] outs[1]
+1 1
+.names dataReg[2] outs[2]
+1 1
+.names dataReg[3] outs[3]
+1 1
+.names control.outputValid outs_valid
+1 1
+.end

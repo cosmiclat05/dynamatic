@@ -1,0 +1,163 @@
+# Benchmark "fork_type" written by ABC on Sat Oct 19 00:45:20 2024
+.model fork_type
+.inputs clk rst ins[0] ins[1] ins_valid outs_ready[0] outs_ready[1] \
+ outs_ready[2] outs_ready[3] outs_ready[4] outs_ready[5] outs_ready[6] \
+ outs_ready[7] outs_ready[8] outs_ready[9]
+.outputs ins_ready outs[0] outs[1] outs[2] outs[3] outs[4] outs[5] outs[6] \
+ outs[7] outs[8] outs[9] outs[10] outs[11] outs[12] outs[13] outs[14] \
+ outs[15] outs[16] outs[17] outs[18] outs[19] outs_valid[0] outs_valid[1] \
+ outs_valid[2] outs_valid[3] outs_valid[4] outs_valid[5] outs_valid[6] \
+ outs_valid[7] outs_valid[8] outs_valid[9]
+
+.latch        n94 control.regBlock[0].regblock.transmitValue  1
+.latch        n99 control.regBlock[1].regblock.transmitValue  1
+.latch       n104 control.regBlock[2].regblock.transmitValue  1
+.latch       n109 control.regBlock[3].regblock.transmitValue  1
+.latch       n114 control.regBlock[4].regblock.transmitValue  1
+.latch       n119 control.regBlock[5].regblock.transmitValue  1
+.latch       n124 control.regBlock[6].regblock.transmitValue  1
+.latch       n129 control.regBlock[7].regblock.transmitValue  1
+.latch       n134 control.regBlock[8].regblock.transmitValue  1
+.latch       n139 control.regBlock[9].regblock.transmitValue  1
+
+.names outs_ready[6] control.regBlock[6].regblock.transmitValue new_n77
+01 1
+.names outs_ready[7] control.regBlock[7].regblock.transmitValue new_n78
+01 1
+.names outs_ready[8] control.regBlock[8].regblock.transmitValue new_n79
+01 1
+.names outs_ready[9] control.regBlock[9].regblock.transmitValue new_n80
+01 1
+.names outs_ready[0] control.regBlock[0].regblock.transmitValue new_n81
+01 1
+.names outs_ready[1] control.regBlock[1].regblock.transmitValue new_n82
+01 1
+.names outs_ready[2] control.regBlock[2].regblock.transmitValue new_n83
+01 1
+.names outs_ready[3] control.regBlock[3].regblock.transmitValue new_n84
+01 1
+.names outs_ready[4] control.regBlock[4].regblock.transmitValue new_n85
+01 1
+.names outs_ready[5] control.regBlock[5].regblock.transmitValue new_n86
+01 1
+.names new_n77 new_n78 new_n87
+00 1
+.names new_n79 new_n80 new_n88
+00 1
+.names new_n81 new_n82 new_n89
+00 1
+.names new_n83 new_n84 new_n90
+00 1
+.names new_n85 new_n86 new_n91
+00 1
+.names new_n90 new_n91 new_n92
+11 1
+.names new_n88 new_n89 new_n93
+11 1
+.names new_n87 new_n93 new_n94_1
+11 1
+.names new_n92 new_n94_1 ins_ready
+11 1
+.names ins_valid control.regBlock[0].regblock.transmitValue outs_valid[0]
+11 1
+.names ins_valid control.regBlock[1].regblock.transmitValue outs_valid[1]
+11 1
+.names ins_valid control.regBlock[2].regblock.transmitValue outs_valid[2]
+11 1
+.names ins_valid control.regBlock[3].regblock.transmitValue outs_valid[3]
+11 1
+.names ins_valid control.regBlock[4].regblock.transmitValue outs_valid[4]
+11 1
+.names ins_valid control.regBlock[5].regblock.transmitValue outs_valid[5]
+11 1
+.names ins_valid control.regBlock[6].regblock.transmitValue outs_valid[6]
+11 1
+.names ins_valid control.regBlock[7].regblock.transmitValue outs_valid[7]
+11 1
+.names ins_valid control.regBlock[8].regblock.transmitValue outs_valid[8]
+11 1
+.names ins_valid control.regBlock[9].regblock.transmitValue outs_valid[9]
+11 1
+.names ins_valid ins_ready new_n106
+10 1
+.names rst new_n81 new_n107
+00 1
+.names new_n106 new_n107 n94
+11 0
+.names rst new_n82 new_n109_1
+00 1
+.names new_n106 new_n109_1 n99
+11 0
+.names rst new_n83 new_n111
+00 1
+.names new_n106 new_n111 n104
+11 0
+.names rst new_n84 new_n113
+00 1
+.names new_n106 new_n113 n109
+11 0
+.names rst new_n85 new_n115
+00 1
+.names new_n106 new_n115 n114
+11 0
+.names rst new_n86 new_n117
+00 1
+.names new_n106 new_n117 n119
+11 0
+.names rst new_n77 new_n119_1
+00 1
+.names new_n106 new_n119_1 n124
+11 0
+.names rst new_n78 new_n121
+00 1
+.names new_n106 new_n121 n129
+11 0
+.names rst new_n79 new_n123
+00 1
+.names new_n106 new_n123 n134
+11 0
+.names rst new_n80 new_n125
+00 1
+.names new_n106 new_n125 n139
+11 0
+.names ins[0] outs[0]
+1 1
+.names ins[1] outs[1]
+1 1
+.names ins[0] outs[2]
+1 1
+.names ins[1] outs[3]
+1 1
+.names ins[0] outs[4]
+1 1
+.names ins[1] outs[5]
+1 1
+.names ins[0] outs[6]
+1 1
+.names ins[1] outs[7]
+1 1
+.names ins[0] outs[8]
+1 1
+.names ins[1] outs[9]
+1 1
+.names ins[0] outs[10]
+1 1
+.names ins[1] outs[11]
+1 1
+.names ins[0] outs[12]
+1 1
+.names ins[1] outs[13]
+1 1
+.names ins[0] outs[14]
+1 1
+.names ins[1] outs[15]
+1 1
+.names ins[0] outs[16]
+1 1
+.names ins[1] outs[17]
+1 1
+.names ins[0] outs[18]
+1 1
+.names ins[1] outs[19]
+1 1
+.end

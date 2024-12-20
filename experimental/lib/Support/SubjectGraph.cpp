@@ -415,6 +415,8 @@ ForkSubjectGraph::ForkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
 void ForkSubjectGraph::connectInputNodes() {
   if (!inputModules.empty()) {
+    llvm::errs() << "Input Module: "
+                 << inputModules[0]->getName().getStringRef() << "\n";
     connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
   }
 }
@@ -1107,11 +1109,7 @@ OperationDifferentiator::OperationDifferentiator(Operation *ops) : op(ops) {
       .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::ExtFOp,
             handshake::TruncIOp, handshake::TruncFOp>(
           [&](auto) { moduleMap[op] = new ExtTruncSubjectGraph(op); })
-      .Default([&](auto) {
-        llvm::errs() << "No subject graph can be generated for this "
-                     << "operation: " << op->getName() << "\n";
-        return;
-      });
+      .Default([&](auto) { return; });
 }
 
 // SubjectGraphGenerator implementation

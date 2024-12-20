@@ -1,0 +1,95 @@
+# Benchmark "mc_load" written by ABC on Sat Oct 19 00:47:17 2024
+.model mc_load
+.inputs clk rst addrIn[0] addrIn[1] addrIn[2] addrIn_valid addrOut_ready \
+ dataFromMem dataFromMem_valid dataOut_ready
+.outputs addrIn_ready addrOut[0] addrOut[1] addrOut[2] addrOut_valid \
+ dataFromMem_ready dataOut dataOut_valid
+
+.latch        n38 addr_tehb.dataReg[0]  0
+.latch        n43 addr_tehb.dataReg[1]  0
+.latch        n48 addr_tehb.dataReg[2]  0
+.latch        n53 addr_tehb.control.fullReg  0
+.latch        n58 data_tehb.dataReg  0
+.latch        n63 data_tehb.control.fullReg  0
+
+.names addr_tehb.dataReg[0] addr_tehb.control.fullReg new_n37
+11 1
+.names addrIn[0] addr_tehb.control.fullReg new_n38_1
+10 1
+.names new_n37 new_n38_1 addrOut[0]
+00 0
+.names addr_tehb.dataReg[1] addr_tehb.control.fullReg new_n40
+11 1
+.names addrIn[1] addr_tehb.control.fullReg new_n41
+10 1
+.names new_n40 new_n41 addrOut[1]
+00 0
+.names addr_tehb.dataReg[2] addr_tehb.control.fullReg new_n43_1
+11 1
+.names addrIn[2] addr_tehb.control.fullReg new_n44
+10 1
+.names new_n43_1 new_n44 addrOut[2]
+00 0
+.names addrIn_valid addr_tehb.control.fullReg addrOut_valid
+00 0
+.names data_tehb.dataReg data_tehb.control.fullReg new_n47
+11 1
+.names dataFromMem data_tehb.control.fullReg new_n48_1
+10 1
+.names new_n47 new_n48_1 dataOut
+00 0
+.names dataFromMem_valid data_tehb.control.fullReg dataOut_valid
+00 0
+.names addrIn_valid addrOut_ready new_n51
+10 1
+.names addr_tehb.control.fullReg new_n51 new_n52
+01 1
+.names addr_tehb.dataReg[0] new_n52 new_n53_1
+10 1
+.names addrIn[0] new_n52 new_n54
+11 1
+.names new_n53_1 new_n54 new_n55
+00 1
+.names rst new_n55 n38
+00 1
+.names addr_tehb.dataReg[1] new_n52 new_n57
+10 1
+.names addrIn[1] new_n52 new_n58_1
+11 1
+.names new_n57 new_n58_1 new_n59
+00 1
+.names rst new_n59 n43
+00 1
+.names addr_tehb.dataReg[2] new_n52 new_n61
+10 1
+.names addrIn[2] new_n52 new_n62
+11 1
+.names new_n61 new_n62 new_n63_1
+00 1
+.names rst new_n63_1 n48
+00 1
+.names rst addrOut_ready new_n65
+00 1
+.names addrOut_valid new_n65 n53
+11 1
+.names dataFromMem_valid dataOut_ready new_n67
+10 1
+.names data_tehb.control.fullReg new_n67 new_n68
+01 1
+.names data_tehb.dataReg new_n68 new_n69
+10 1
+.names dataFromMem new_n68 new_n70
+11 1
+.names new_n69 new_n70 new_n71
+00 1
+.names rst new_n71 n58
+00 1
+.names rst dataOut_ready new_n73
+00 1
+.names dataOut_valid new_n73 n63
+11 1
+.names addr_tehb.control.fullReg addrIn_ready
+0 1
+.names data_tehb.control.fullReg dataFromMem_ready
+0 1
+.end

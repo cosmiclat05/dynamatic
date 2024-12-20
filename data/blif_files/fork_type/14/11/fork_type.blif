@@ -1,0 +1,496 @@
+# Benchmark "fork_type" written by ABC on Sat Oct 19 00:45:44 2024
+.model fork_type
+.inputs clk rst ins[0] ins[1] ins[2] ins[3] ins[4] ins[5] ins[6] ins[7] \
+ ins[8] ins[9] ins[10] ins_valid outs_ready[0] outs_ready[1] outs_ready[2] \
+ outs_ready[3] outs_ready[4] outs_ready[5] outs_ready[6] outs_ready[7] \
+ outs_ready[8] outs_ready[9] outs_ready[10] outs_ready[11] outs_ready[12] \
+ outs_ready[13]
+.outputs ins_ready outs[0] outs[1] outs[2] outs[3] outs[4] outs[5] outs[6] \
+ outs[7] outs[8] outs[9] outs[10] outs[11] outs[12] outs[13] outs[14] \
+ outs[15] outs[16] outs[17] outs[18] outs[19] outs[20] outs[21] outs[22] \
+ outs[23] outs[24] outs[25] outs[26] outs[27] outs[28] outs[29] outs[30] \
+ outs[31] outs[32] outs[33] outs[34] outs[35] outs[36] outs[37] outs[38] \
+ outs[39] outs[40] outs[41] outs[42] outs[43] outs[44] outs[45] outs[46] \
+ outs[47] outs[48] outs[49] outs[50] outs[51] outs[52] outs[53] outs[54] \
+ outs[55] outs[56] outs[57] outs[58] outs[59] outs[60] outs[61] outs[62] \
+ outs[63] outs[64] outs[65] outs[66] outs[67] outs[68] outs[69] outs[70] \
+ outs[71] outs[72] outs[73] outs[74] outs[75] outs[76] outs[77] outs[78] \
+ outs[79] outs[80] outs[81] outs[82] outs[83] outs[84] outs[85] outs[86] \
+ outs[87] outs[88] outs[89] outs[90] outs[91] outs[92] outs[93] outs[94] \
+ outs[95] outs[96] outs[97] outs[98] outs[99] outs[100] outs[101] outs[102] \
+ outs[103] outs[104] outs[105] outs[106] outs[107] outs[108] outs[109] \
+ outs[110] outs[111] outs[112] outs[113] outs[114] outs[115] outs[116] \
+ outs[117] outs[118] outs[119] outs[120] outs[121] outs[122] outs[123] \
+ outs[124] outs[125] outs[126] outs[127] outs[128] outs[129] outs[130] \
+ outs[131] outs[132] outs[133] outs[134] outs[135] outs[136] outs[137] \
+ outs[138] outs[139] outs[140] outs[141] outs[142] outs[143] outs[144] \
+ outs[145] outs[146] outs[147] outs[148] outs[149] outs[150] outs[151] \
+ outs[152] outs[153] outs_valid[0] outs_valid[1] outs_valid[2] \
+ outs_valid[3] outs_valid[4] outs_valid[5] outs_valid[6] outs_valid[7] \
+ outs_valid[8] outs_valid[9] outs_valid[10] outs_valid[11] outs_valid[12] \
+ outs_valid[13]
+
+.latch       n396 control.regBlock[0].regblock.transmitValue  1
+.latch       n401 control.regBlock[10].regblock.transmitValue  1
+.latch       n406 control.regBlock[11].regblock.transmitValue  1
+.latch       n411 control.regBlock[12].regblock.transmitValue  1
+.latch       n416 control.regBlock[13].regblock.transmitValue  1
+.latch       n421 control.regBlock[1].regblock.transmitValue  1
+.latch       n426 control.regBlock[2].regblock.transmitValue  1
+.latch       n431 control.regBlock[3].regblock.transmitValue  1
+.latch       n436 control.regBlock[4].regblock.transmitValue  1
+.latch       n441 control.regBlock[5].regblock.transmitValue  1
+.latch       n446 control.regBlock[6].regblock.transmitValue  1
+.latch       n451 control.regBlock[7].regblock.transmitValue  1
+.latch       n456 control.regBlock[8].regblock.transmitValue  1
+.latch       n461 control.regBlock[9].regblock.transmitValue  1
+
+.names outs_ready[0] control.regBlock[0].regblock.transmitValue new_n240
+01 1
+.names outs_ready[1] control.regBlock[1].regblock.transmitValue new_n241
+01 1
+.names outs_ready[2] control.regBlock[2].regblock.transmitValue new_n242
+01 1
+.names outs_ready[3] control.regBlock[3].regblock.transmitValue new_n243
+01 1
+.names outs_ready[4] control.regBlock[4].regblock.transmitValue new_n244
+01 1
+.names outs_ready[5] control.regBlock[5].regblock.transmitValue new_n245
+01 1
+.names outs_ready[10] control.regBlock[10].regblock.transmitValue new_n246
+01 1
+.names outs_ready[11] control.regBlock[11].regblock.transmitValue new_n247
+01 1
+.names outs_ready[12] control.regBlock[12].regblock.transmitValue new_n248
+01 1
+.names outs_ready[13] control.regBlock[13].regblock.transmitValue new_n249
+01 1
+.names outs_ready[6] control.regBlock[6].regblock.transmitValue new_n250
+01 1
+.names outs_ready[7] control.regBlock[7].regblock.transmitValue new_n251
+01 1
+.names outs_ready[8] control.regBlock[8].regblock.transmitValue new_n252
+01 1
+.names outs_ready[9] control.regBlock[9].regblock.transmitValue new_n253
+01 1
+.names new_n240 new_n241 new_n254
+00 1
+.names new_n242 new_n243 new_n255
+00 1
+.names new_n244 new_n245 new_n256
+00 1
+.names new_n246 new_n247 new_n257
+00 1
+.names new_n248 new_n249 new_n258
+00 1
+.names new_n250 new_n251 new_n259
+00 1
+.names new_n252 new_n253 new_n260
+00 1
+.names new_n259 new_n260 new_n261
+11 1
+.names new_n257 new_n258 new_n262
+11 1
+.names new_n255 new_n256 new_n263
+11 1
+.names new_n254 new_n263 new_n264
+11 1
+.names new_n261 new_n262 new_n265
+11 1
+.names new_n264 new_n265 ins_ready
+11 1
+.names ins_valid control.regBlock[0].regblock.transmitValue outs_valid[0]
+11 1
+.names ins_valid control.regBlock[1].regblock.transmitValue outs_valid[1]
+11 1
+.names ins_valid control.regBlock[2].regblock.transmitValue outs_valid[2]
+11 1
+.names ins_valid control.regBlock[3].regblock.transmitValue outs_valid[3]
+11 1
+.names ins_valid control.regBlock[4].regblock.transmitValue outs_valid[4]
+11 1
+.names ins_valid control.regBlock[5].regblock.transmitValue outs_valid[5]
+11 1
+.names ins_valid control.regBlock[6].regblock.transmitValue outs_valid[6]
+11 1
+.names ins_valid control.regBlock[7].regblock.transmitValue outs_valid[7]
+11 1
+.names ins_valid control.regBlock[8].regblock.transmitValue outs_valid[8]
+11 1
+.names ins_valid control.regBlock[9].regblock.transmitValue outs_valid[9]
+11 1
+.names ins_valid control.regBlock[10].regblock.transmitValue outs_valid[10]
+11 1
+.names ins_valid control.regBlock[11].regblock.transmitValue outs_valid[11]
+11 1
+.names ins_valid control.regBlock[12].regblock.transmitValue outs_valid[12]
+11 1
+.names ins_valid control.regBlock[13].regblock.transmitValue outs_valid[13]
+11 1
+.names ins_valid ins_ready new_n281
+10 1
+.names rst new_n240 new_n282
+00 1
+.names new_n281 new_n282 n396
+11 0
+.names rst new_n246 new_n284
+00 1
+.names new_n281 new_n284 n401
+11 0
+.names rst new_n247 new_n286
+00 1
+.names new_n281 new_n286 n406
+11 0
+.names rst new_n248 new_n288
+00 1
+.names new_n281 new_n288 n411
+11 0
+.names rst new_n249 new_n290
+00 1
+.names new_n281 new_n290 n416
+11 0
+.names rst new_n241 new_n292
+00 1
+.names new_n281 new_n292 n421
+11 0
+.names rst new_n242 new_n294
+00 1
+.names new_n281 new_n294 n426
+11 0
+.names rst new_n243 new_n296
+00 1
+.names new_n281 new_n296 n431
+11 0
+.names rst new_n244 new_n298
+00 1
+.names new_n281 new_n298 n436
+11 0
+.names rst new_n245 new_n300
+00 1
+.names new_n281 new_n300 n441
+11 0
+.names rst new_n250 new_n302
+00 1
+.names new_n281 new_n302 n446
+11 0
+.names rst new_n251 new_n304
+00 1
+.names new_n281 new_n304 n451
+11 0
+.names rst new_n252 new_n306
+00 1
+.names new_n281 new_n306 n456
+11 0
+.names rst new_n253 new_n308
+00 1
+.names new_n281 new_n308 n461
+11 0
+.names ins[0] outs[0]
+1 1
+.names ins[1] outs[1]
+1 1
+.names ins[2] outs[2]
+1 1
+.names ins[3] outs[3]
+1 1
+.names ins[4] outs[4]
+1 1
+.names ins[5] outs[5]
+1 1
+.names ins[6] outs[6]
+1 1
+.names ins[7] outs[7]
+1 1
+.names ins[8] outs[8]
+1 1
+.names ins[9] outs[9]
+1 1
+.names ins[10] outs[10]
+1 1
+.names ins[0] outs[11]
+1 1
+.names ins[1] outs[12]
+1 1
+.names ins[2] outs[13]
+1 1
+.names ins[3] outs[14]
+1 1
+.names ins[4] outs[15]
+1 1
+.names ins[5] outs[16]
+1 1
+.names ins[6] outs[17]
+1 1
+.names ins[7] outs[18]
+1 1
+.names ins[8] outs[19]
+1 1
+.names ins[9] outs[20]
+1 1
+.names ins[10] outs[21]
+1 1
+.names ins[0] outs[22]
+1 1
+.names ins[1] outs[23]
+1 1
+.names ins[2] outs[24]
+1 1
+.names ins[3] outs[25]
+1 1
+.names ins[4] outs[26]
+1 1
+.names ins[5] outs[27]
+1 1
+.names ins[6] outs[28]
+1 1
+.names ins[7] outs[29]
+1 1
+.names ins[8] outs[30]
+1 1
+.names ins[9] outs[31]
+1 1
+.names ins[10] outs[32]
+1 1
+.names ins[0] outs[33]
+1 1
+.names ins[1] outs[34]
+1 1
+.names ins[2] outs[35]
+1 1
+.names ins[3] outs[36]
+1 1
+.names ins[4] outs[37]
+1 1
+.names ins[5] outs[38]
+1 1
+.names ins[6] outs[39]
+1 1
+.names ins[7] outs[40]
+1 1
+.names ins[8] outs[41]
+1 1
+.names ins[9] outs[42]
+1 1
+.names ins[10] outs[43]
+1 1
+.names ins[0] outs[44]
+1 1
+.names ins[1] outs[45]
+1 1
+.names ins[2] outs[46]
+1 1
+.names ins[3] outs[47]
+1 1
+.names ins[4] outs[48]
+1 1
+.names ins[5] outs[49]
+1 1
+.names ins[6] outs[50]
+1 1
+.names ins[7] outs[51]
+1 1
+.names ins[8] outs[52]
+1 1
+.names ins[9] outs[53]
+1 1
+.names ins[10] outs[54]
+1 1
+.names ins[0] outs[55]
+1 1
+.names ins[1] outs[56]
+1 1
+.names ins[2] outs[57]
+1 1
+.names ins[3] outs[58]
+1 1
+.names ins[4] outs[59]
+1 1
+.names ins[5] outs[60]
+1 1
+.names ins[6] outs[61]
+1 1
+.names ins[7] outs[62]
+1 1
+.names ins[8] outs[63]
+1 1
+.names ins[9] outs[64]
+1 1
+.names ins[10] outs[65]
+1 1
+.names ins[0] outs[66]
+1 1
+.names ins[1] outs[67]
+1 1
+.names ins[2] outs[68]
+1 1
+.names ins[3] outs[69]
+1 1
+.names ins[4] outs[70]
+1 1
+.names ins[5] outs[71]
+1 1
+.names ins[6] outs[72]
+1 1
+.names ins[7] outs[73]
+1 1
+.names ins[8] outs[74]
+1 1
+.names ins[9] outs[75]
+1 1
+.names ins[10] outs[76]
+1 1
+.names ins[0] outs[77]
+1 1
+.names ins[1] outs[78]
+1 1
+.names ins[2] outs[79]
+1 1
+.names ins[3] outs[80]
+1 1
+.names ins[4] outs[81]
+1 1
+.names ins[5] outs[82]
+1 1
+.names ins[6] outs[83]
+1 1
+.names ins[7] outs[84]
+1 1
+.names ins[8] outs[85]
+1 1
+.names ins[9] outs[86]
+1 1
+.names ins[10] outs[87]
+1 1
+.names ins[0] outs[88]
+1 1
+.names ins[1] outs[89]
+1 1
+.names ins[2] outs[90]
+1 1
+.names ins[3] outs[91]
+1 1
+.names ins[4] outs[92]
+1 1
+.names ins[5] outs[93]
+1 1
+.names ins[6] outs[94]
+1 1
+.names ins[7] outs[95]
+1 1
+.names ins[8] outs[96]
+1 1
+.names ins[9] outs[97]
+1 1
+.names ins[10] outs[98]
+1 1
+.names ins[0] outs[99]
+1 1
+.names ins[1] outs[100]
+1 1
+.names ins[2] outs[101]
+1 1
+.names ins[3] outs[102]
+1 1
+.names ins[4] outs[103]
+1 1
+.names ins[5] outs[104]
+1 1
+.names ins[6] outs[105]
+1 1
+.names ins[7] outs[106]
+1 1
+.names ins[8] outs[107]
+1 1
+.names ins[9] outs[108]
+1 1
+.names ins[10] outs[109]
+1 1
+.names ins[0] outs[110]
+1 1
+.names ins[1] outs[111]
+1 1
+.names ins[2] outs[112]
+1 1
+.names ins[3] outs[113]
+1 1
+.names ins[4] outs[114]
+1 1
+.names ins[5] outs[115]
+1 1
+.names ins[6] outs[116]
+1 1
+.names ins[7] outs[117]
+1 1
+.names ins[8] outs[118]
+1 1
+.names ins[9] outs[119]
+1 1
+.names ins[10] outs[120]
+1 1
+.names ins[0] outs[121]
+1 1
+.names ins[1] outs[122]
+1 1
+.names ins[2] outs[123]
+1 1
+.names ins[3] outs[124]
+1 1
+.names ins[4] outs[125]
+1 1
+.names ins[5] outs[126]
+1 1
+.names ins[6] outs[127]
+1 1
+.names ins[7] outs[128]
+1 1
+.names ins[8] outs[129]
+1 1
+.names ins[9] outs[130]
+1 1
+.names ins[10] outs[131]
+1 1
+.names ins[0] outs[132]
+1 1
+.names ins[1] outs[133]
+1 1
+.names ins[2] outs[134]
+1 1
+.names ins[3] outs[135]
+1 1
+.names ins[4] outs[136]
+1 1
+.names ins[5] outs[137]
+1 1
+.names ins[6] outs[138]
+1 1
+.names ins[7] outs[139]
+1 1
+.names ins[8] outs[140]
+1 1
+.names ins[9] outs[141]
+1 1
+.names ins[10] outs[142]
+1 1
+.names ins[0] outs[143]
+1 1
+.names ins[1] outs[144]
+1 1
+.names ins[2] outs[145]
+1 1
+.names ins[3] outs[146]
+1 1
+.names ins[4] outs[147]
+1 1
+.names ins[5] outs[148]
+1 1
+.names ins[6] outs[149]
+1 1
+.names ins[7] outs[150]
+1 1
+.names ins[8] outs[151]
+1 1
+.names ins[9] outs[152]
+1 1
+.names ins[10] outs[153]
+1 1
+.end
