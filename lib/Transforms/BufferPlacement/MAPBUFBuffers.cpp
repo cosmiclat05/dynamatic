@@ -42,18 +42,20 @@ using namespace dynamatic::buffer::mapbuf;
 
 MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
                              const TimingDatabase &timingDB,
-                             double targetPeriod)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod) {
+                             double targetPeriod, StringRef blifFiles)
+    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod),
+      blifFiles(blifFiles) {
   if (!unsatisfiable)
     setup();
 }
 
 MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
                              const TimingDatabase &timingDB,
-                             double targetPeriod, Logger &logger,
-                             StringRef milpName)
+                             double targetPeriod, StringRef blifFiles,
+                             Logger &logger, StringRef milpName)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                          milpName) {
+                          milpName),
+      blifFiles(blifFiles) {
   if (!unsatisfiable)
     setup();
 }
@@ -139,7 +141,6 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
   bool isCmpi = false;
 
   if (!definingOp) {
-    // Handle null case appropriately
     return;
   }
 
@@ -454,11 +455,11 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
 
   modelFeedback.update();
 
-  if (!blifFile.empty())
-    modelFeedback.write(blifFile.str() + "_feedback_arc.lp");
-  modelFeedback.optimize();
-  if (!blifFile.empty())
-    modelFeedback.write(blifFile.str() + "_feedback_arc_solution.json");
+  // if (!blifFile.empty())
+  //   modelFeedback.write(blifFile.str() + "_feedback_arc.lp");
+  // modelFeedback.optimize();
+  // if (!blifFile.empty())
+  //   modelFeedback.write(blifFile.str() + "_feedback_arc_solution.json");
 
   for (const auto &entry : edgeToOps) {
     auto edgeVar = entry.second;
@@ -681,7 +682,8 @@ void MAPBUFBuffers::setup() {
   }
 
   // The generator class to initialize the subject graphs of the modules
-  experimental::SubjectGraphGenerator generateSubjectGraph(funcInfo.funcOp);
+  experimental::SubjectGraphGenerator generateSubjectGraph(funcInfo.funcOp,
+                                                           blifFiles);
 
   // boolean to choose between different acyclic graph convertion methods
   bool acyclicType = false;

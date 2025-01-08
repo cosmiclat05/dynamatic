@@ -154,7 +154,7 @@ void BaseSubjectGraph::changeInput(BaseSubjectGraph *graph,
 
 void BaseSubjectGraph::appendVarsToPath(
     std::initializer_list<unsigned int> inputs) {
-  fullPath += moduleType + "/";
+  fullPath = baseBlifPath + "/" + moduleType + "/";
   for (int input : inputs) {
     fullPath += std::to_string(input) + "/";
   }
@@ -415,8 +415,6 @@ ForkSubjectGraph::ForkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
 void ForkSubjectGraph::connectInputNodes() {
   if (!inputModules.empty()) {
-    llvm::errs() << "Input Module: "
-                 << inputModules[0]->getName().getStringRef() << "\n";
     connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
   }
 }
@@ -1113,7 +1111,9 @@ OperationDifferentiator::OperationDifferentiator(Operation *ops) : op(ops) {
 }
 
 // SubjectGraphGenerator implementation
-SubjectGraphGenerator::SubjectGraphGenerator(handshake::FuncOp funcOp) {
+SubjectGraphGenerator::SubjectGraphGenerator(handshake::FuncOp funcOp,
+                                             StringRef blifFiles) {
+  BaseSubjectGraph::setBaseBlifPath(blifFiles);
   funcOp.walk(
       [&](Operation *op) { (experimental::OperationDifferentiator(op)); });
 

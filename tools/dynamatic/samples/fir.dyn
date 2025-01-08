@@ -6,7 +6,7 @@ set-dynamatic-path  .
 
 # Set the source file to run (kernel must have the same name as the filename,
 # without the extension)
-set-src             integration-test/fir/fir.c
+set-src             integration-test/cnn/cnn.c
 
 # Compile (from source to Handshake IR/DOT)
 # Remove the flag to run smart buffer placement (requires Gurobi)

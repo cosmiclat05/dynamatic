@@ -78,6 +78,7 @@ class BaseSubjectGraph {
 public:
   static inline DenseMap<Operation *, BaseSubjectGraph *> moduleMap;
   static inline DenseMap<BaseSubjectGraph *, Operation *> subjectGraphMap;
+  static inline std::string baseBlifPath;
 
 protected:
   bool isBlackbox = false;
@@ -92,7 +93,7 @@ protected:
   DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResNum;
   DenseMap<BaseSubjectGraph *, unsigned int> outputSubjectGraphToResNum;
 
-  std::string fullPath = "/home/oyasar/dynamatic/data/blif_files/";
+  std::string fullPath;
   std::string moduleType;
   std::string uniqueName;
   BlifData *blifData;
@@ -122,6 +123,9 @@ public:
   std::string &getModuleType();
   std::vector<BaseSubjectGraph *> getInputSubjectGraphs();
   std::vector<BaseSubjectGraph *> getOutputSubjectGraphs();
+  static void setBaseBlifPath(llvm::StringRef path) {
+    baseBlifPath = path.str();
+  }
 
   virtual ~BaseSubjectGraph() = default;
   virtual void connectInputNodes() = 0;
@@ -320,7 +324,7 @@ public:
 
 class SubjectGraphGenerator {
 public:
-  SubjectGraphGenerator(handshake::FuncOp funcOp);
+  SubjectGraphGenerator(handshake::FuncOp funcOp, StringRef blifFiles);
 };
 
 } // namespace experimental

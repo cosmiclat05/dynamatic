@@ -97,7 +97,8 @@ BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
 
 HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
+    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs,
+    StringRef blifFiles) {
   this->algorithm = algorithm.str();
   this->frequencies = frequencies.str();
   this->timingModels = timingModels.str();
@@ -105,6 +106,7 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->targetCP = targetCP;
   this->timeout = timeout;
   this->dumpLogs = dumpLogs;
+  this->blifFiles = blifFiles.str();
 }
 
 void HandshakePlaceBuffersPass::runDynamaticPass() {
@@ -494,7 +496,8 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   if (algorithm == MAPBUF) {
     // Create and solve the MILP
     return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
-        logger, "placement", placement, env, info, timingDB, targetCP);
+        logger, "placement", placement, env, info, timingDB, targetCP,
+        blifFiles);
   }
 
   llvm_unreachable("unknown algorithm");
@@ -591,10 +594,13 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::buffer::createHandshakePlaceBuffers(
-    StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
+dynamatic::buffer::createHandshakePlaceBuffers(StringRef algorithm,
+                                               StringRef frequencies,
+                                               StringRef timingModels,
+                                               bool firstCFDFC, double targetCP,
+                                               unsigned timeout, bool dumpLogs,
+                                               StringRef blifFiles) {
   return std::make_unique<HandshakePlaceBuffersPass>(
       algorithm, frequencies, timingModels, firstCFDFC, targetCP, timeout,
-      dumpLogs);
+      dumpLogs, blifFiles);
 }

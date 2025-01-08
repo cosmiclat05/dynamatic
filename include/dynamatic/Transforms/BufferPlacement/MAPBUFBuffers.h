@@ -58,13 +58,13 @@ public:
   /// the MILP will not be marked ready for optimization, ensuring that further
   /// calls to `optimize` fail.
   MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod);
+                double targetPeriod, StringRef blifFiles);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
   MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, Logger &logger,
+                double targetPeriod, StringRef blifFiles, Logger &logger,
                 StringRef milpName = "placement");
 
 protected:
@@ -76,7 +76,7 @@ private:
   int bigConstant = 100;
   experimental::BlifData *blifData;
   pathMap leafToRootPaths;
-  StringRef blifFile;
+  StringRef blifFiles;
 
   // Adds Blackbox Constraints for the Data Signals of blackbox ADDI, SUBI and
   // CMPI modules. These delays are retrieved from Vivado Timing Reports. Ready
