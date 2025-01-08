@@ -176,7 +176,6 @@ NodeToCuts CutManager::cutless(bool includeChannels) {
     }
 
     n++;
-    llvm::errs() << n << " " << currentWavyLine.size() << "\n";
     currentWavyLine.insert(nextWavyLine.begin(), nextWavyLine.end());
   }
 
