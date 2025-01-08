@@ -140,12 +140,20 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
   Operation *definingOp = channel.getDefiningOp();
   bool isCmpi = false;
 
+  if (!definingOp) {
+    return;
+  }
+
   // Blackbox constraints are only added for ADDI, SUBI and CMPI operations
   // Need a bool for CMPI as it has a different delay than ADDI and SUBI
-  llvm::TypeSwitch<Operation *, void>(definingOp)
-      .Case<handshake::AddIOp, handshake::SubIOp>([&](auto op) {})
-      .Case<handshake::CmpIOp>([&](auto op) { isCmpi = true; })
-      .Default([&](auto) { return; });
+  if (isa<handshake::AddIOp>(definingOp) ||
+      isa<handshake::SubIOp>(definingOp)) {
+    // Do nothing for AddIOp and SubIOp
+  } else if (isa<handshake::CmpIOp>(definingOp)) {
+    isCmpi = true;
+  } else {
+    return;
+  }
 
   for (unsigned int i = 0; i < definingOp->getNumOperands(); i++) {
     // Looping over the input channels of the blackbox operation
@@ -674,7 +682,8 @@ void MAPBUFBuffers::setup() {
   }
 
   // The generator class to initialize the subject graphs of the modules
-  experimental::SubjectGraphGenerator generateSubjectGraph(funcInfo.funcOp);
+  experimental::SubjectGraphGenerator generateSubjectGraph(funcInfo.funcOp,
+                                                           blifFile);
 
   // boolean to choose between different acyclic graph convertion methods
   bool acyclicType = false;

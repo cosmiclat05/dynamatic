@@ -92,8 +92,8 @@ protected:
   DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResNum;
   DenseMap<BaseSubjectGraph *, unsigned int> outputSubjectGraphToResNum;
 
-  std::string fullPath =
-      "./data/blif_files/"; // blif files are under /dynamatic/data/blif_files/
+  std::string fullPath;
+  static inline std::string baseBlifPath;
   std::string moduleType;
   std::string uniqueName;
   BlifData *blifData;
@@ -123,6 +123,10 @@ public:
   std::string &getModuleType();
   std::vector<BaseSubjectGraph *> getInputSubjectGraphs();
   std::vector<BaseSubjectGraph *> getOutputSubjectGraphs();
+
+  static void setBaseBlifPath(llvm::StringRef path) {
+    baseBlifPath = path.str();
+  }
 
   virtual ~BaseSubjectGraph() = default;
   virtual void connectInputNodes() = 0;
@@ -321,7 +325,7 @@ public:
 
 class SubjectGraphGenerator {
 public:
-  SubjectGraphGenerator(handshake::FuncOp funcOp);
+  SubjectGraphGenerator(handshake::FuncOp funcOp, StringRef blifFile);
 };
 
 } // namespace experimental
