@@ -287,6 +287,19 @@ public:
   ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
 };
 
+class MergeSubjectGraph : public BaseSubjectGraph {
+private:
+  unsigned int dataWidth = 0;
+  unsigned int size = 0;
+  std::unordered_map<unsigned int, ChannelSignals> inputNodes;
+  ChannelSignals outputNodes;
+
+public:
+  MergeSubjectGraph(Operation *op);
+  void connectInputNodes() override;
+  ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
+};
+
 class BranchSinkSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;

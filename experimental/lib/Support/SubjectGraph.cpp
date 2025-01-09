@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Support/SubjectGraph.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include <algorithm>
 #include <cassert>
 #include <iterator>
@@ -847,6 +848,59 @@ SelectSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
   return outputNodes;
 }
 
+MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
+  llvm::TypeSwitch<Operation *, void>(op)
+      .Case<handshake::MergeOp>([&](auto mergeOp) {
+        size = mergeOp.getDataOperands().size();
+        dataWidth = handshake::getHandshakeTypeBitWidth(
+            mergeOp.getDataOperands()[0].getType());
+        appendVarsToPath({size, dataWidth});
+      })
+      .Default([&](auto) {
+        assert(false && "Operation does not match any supported type");
+        return;
+      });
+
+  experimental::BlifParser parser;
+  blifData = parser.parseBlifFile(fullPath);
+
+  for (auto &node : blifData->getAllNodes()) {
+    auto nodeName = node->getName();
+    if (nodeName.find("ins") != std::string::npos &&
+        (node->isInput() || node->isOutput())) {
+      if (size == 1) {
+        assignSignals(inputNodes[0], node, nodeName);
+        continue;
+      }
+      size_t bracketPos = nodeName.find('[');
+      std::string number = nodeName.substr(bracketPos + 1);
+      number = number.substr(0, number.find_first_not_of("0123456789"));
+      unsigned int num = std::stoi(number);
+      if (nodeName.find("ready") == std::string::npos &&
+          nodeName.find("valid") == std::string::npos) {
+        num = num / dataWidth;
+      }
+      assignSignals(inputNodes[num], node, nodeName);
+    } else if (nodeName.find("outs") != std::string::npos) {
+      assignSignals(outputNodes, node, nodeName);
+      node->setName(uniqueName + "_" + nodeName);
+    } else if (nodeName.find(".") != std::string::npos ||
+               nodeName.find("dataReg") != std::string::npos) {
+      node->setName(uniqueName + "." + nodeName);
+    }
+  }
+}
+
+void MergeSubjectGraph::connectInputNodes() {
+  for (unsigned int i = 0; i < inputNodes.size(); i++) {
+    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i]);
+  }
+}
+
+ChannelSignals &MergeSubjectGraph::returnOutputNodes(unsigned int) {
+  return outputNodes;
+}
+
 // BranchSinkSubjectGraph implementation
 BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
     : BaseSubjectGraph(op) {
@@ -1060,7 +1114,8 @@ OperationDifferentiator::OperationDifferentiator(Operation *ops) : op(ops) {
       .Case<handshake::ControlMergeOp>([&](handshake::ControlMergeOp cmergeOp) {
         moduleMap[op] = new ControlMergeSubjectGraph(op);
       })
-      .Case<handshake::MergeOp>([&](auto) { op->emitRemark("Merge Op"); })
+      .Case<handshake::MergeOp>(
+          [&](auto) { moduleMap[op] = new MergeSubjectGraph(op); })
       .Case<handshake::JoinOp>([&](auto) { op->emitRemark("Join Op"); })
       .Case<handshake::BranchOp, handshake::SinkOp>(
           [&](auto) { moduleMap[op] = new BranchSinkSubjectGraph(op); })
