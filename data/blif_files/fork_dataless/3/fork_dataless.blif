@@ -1,0 +1,40 @@
+# Benchmark "fork_dataless" written by ABC on Sat Oct 19 00:41:55 2024
+.model fork_dataless
+.inputs clk rst ins_valid outs_ready[0] outs_ready[1] outs_ready[2]
+.outputs ins_ready outs_valid[0] outs_valid[1] outs_valid[2]
+
+.latch        n22 regBlock[0].regblock.transmitValue  1
+.latch        n27 regBlock[1].regblock.transmitValue  1
+.latch        n32 regBlock[2].regblock.transmitValue  1
+
+.names outs_ready[1] regBlock[1].regblock.transmitValue new_n20
+01 1
+.names outs_ready[2] regBlock[2].regblock.transmitValue new_n21
+01 1
+.names outs_ready[0] regBlock[0].regblock.transmitValue new_n22_1
+01 1
+.names new_n20 new_n21 new_n23
+00 1
+.names new_n22_1 new_n23 ins_ready
+01 1
+.names ins_valid regBlock[0].regblock.transmitValue outs_valid[0]
+11 1
+.names ins_valid regBlock[1].regblock.transmitValue outs_valid[1]
+11 1
+.names ins_valid regBlock[2].regblock.transmitValue outs_valid[2]
+11 1
+.names ins_valid ins_ready new_n28
+10 1
+.names rst new_n22_1 new_n29
+00 1
+.names new_n28 new_n29 n22
+11 0
+.names rst new_n20 new_n31
+00 1
+.names new_n28 new_n31 n27
+11 0
+.names rst new_n21 new_n33
+00 1
+.names new_n28 new_n33 n32
+11 0
+.end

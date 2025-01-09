@@ -1,0 +1,11 @@
+# Benchmark "extsi" written by ABC on Sat Oct 19 00:54:30 2024
+.model extsi
+.inputs clk rst ins ins_valid outs_ready
+.outputs ins_ready outs outs_valid
+.names outs_ready ins_ready
+1 1
+.names ins outs
+1 1
+.names ins_valid outs_valid
+1 1
+.end

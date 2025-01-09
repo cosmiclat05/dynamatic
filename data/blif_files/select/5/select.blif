@@ -1,0 +1,55 @@
+# Benchmark "selector" written by ABC on Mon Oct 21 18:46:36 2024
+.model selector
+.inputs clk rst condition condition_valid trueValue[0] trueValue[1] \
+ trueValue[2] trueValue[3] trueValue[4] trueValue_valid falseValue[0] \
+ falseValue[1] falseValue[2] falseValue[3] falseValue[4] falseValue_valid \
+ result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result_valid \
+ condition_ready trueValue_ready falseValue_ready
+.names condition falseValue[0] new_n27
+01 1
+.names condition trueValue[0] new_n28
+11 1
+.names new_n27 new_n28 result[0]
+00 0
+.names condition falseValue[1] new_n30
+01 1
+.names condition trueValue[1] new_n31
+11 1
+.names new_n30 new_n31 result[1]
+00 0
+.names condition falseValue[2] new_n33
+01 1
+.names condition trueValue[2] new_n34
+11 1
+.names new_n33 new_n34 result[2]
+00 0
+.names condition falseValue[3] new_n36
+01 1
+.names condition trueValue[3] new_n37
+11 1
+.names new_n36 new_n37 result[3]
+00 0
+.names condition falseValue[4] new_n39
+01 1
+.names condition trueValue[4] new_n40
+11 1
+.names new_n39 new_n40 result[4]
+00 0
+.names condition falseValue_valid new_n42
+01 1
+.names condition trueValue_valid new_n43
+11 1
+.names new_n42 new_n43 new_n44
+00 1
+.names condition_valid new_n44 result_valid
+10 1
+.names result_ready result_valid new_n46
+11 1
+.names condition_valid new_n46 condition_ready
+10 0
+.names trueValue_valid new_n46 trueValue_ready
+10 0
+.names falseValue_valid new_n46 falseValue_ready
+10 0
+.end

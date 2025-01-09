@@ -1,0 +1,48 @@
+# Benchmark "selector" written by ABC on Mon Oct 21 18:46:35 2024
+.model selector
+.inputs clk rst condition condition_valid trueValue[0] trueValue[1] \
+ trueValue[2] trueValue[3] trueValue_valid falseValue[0] falseValue[1] \
+ falseValue[2] falseValue[3] falseValue_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result_valid \
+ condition_ready trueValue_ready falseValue_ready
+.names condition falseValue[0] new_n24
+01 1
+.names condition trueValue[0] new_n25
+11 1
+.names new_n24 new_n25 result[0]
+00 0
+.names condition falseValue[1] new_n27
+01 1
+.names condition trueValue[1] new_n28
+11 1
+.names new_n27 new_n28 result[1]
+00 0
+.names condition falseValue[2] new_n30
+01 1
+.names condition trueValue[2] new_n31
+11 1
+.names new_n30 new_n31 result[2]
+00 0
+.names condition falseValue[3] new_n33
+01 1
+.names condition trueValue[3] new_n34
+11 1
+.names new_n33 new_n34 result[3]
+00 0
+.names condition falseValue_valid new_n36
+01 1
+.names condition trueValue_valid new_n37
+11 1
+.names new_n36 new_n37 new_n38
+00 1
+.names condition_valid new_n38 result_valid
+10 1
+.names result_ready result_valid new_n40
+11 1
+.names condition_valid new_n40 condition_ready
+10 0
+.names trueValue_valid new_n40 trueValue_ready
+10 0
+.names falseValue_valid new_n40 falseValue_ready
+10 0
+.end

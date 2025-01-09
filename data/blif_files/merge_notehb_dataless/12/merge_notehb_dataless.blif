@@ -1,0 +1,55 @@
+# Benchmark "merge_notehb_dataless" written by ABC on Sat Oct 19 00:44:32 2024
+.model merge_notehb_dataless
+.inputs clk rst ins_valid[0] ins_valid[1] ins_valid[2] ins_valid[3] \
+ ins_valid[4] ins_valid[5] ins_valid[6] ins_valid[7] ins_valid[8] \
+ ins_valid[9] ins_valid[10] ins_valid[11] outs_ready
+.outputs ins_ready[0] ins_ready[1] ins_ready[2] ins_ready[3] ins_ready[4] \
+ ins_ready[5] ins_ready[6] ins_ready[7] ins_ready[8] ins_ready[9] \
+ ins_ready[10] ins_ready[11] outs_valid
+.names ins_valid[0] ins_valid[1] new_n29
+00 1
+.names ins_valid[2] ins_valid[3] new_n30
+00 1
+.names ins_valid[4] ins_valid[5] new_n31
+00 1
+.names ins_valid[6] ins_valid[7] new_n32
+00 1
+.names ins_valid[8] ins_valid[9] new_n33
+00 1
+.names ins_valid[10] ins_valid[11] new_n34
+00 1
+.names new_n33 new_n34 new_n35
+11 1
+.names new_n31 new_n32 new_n36
+11 1
+.names new_n29 new_n30 new_n37
+11 1
+.names new_n36 new_n37 new_n38
+11 1
+.names new_n35 new_n38 outs_valid
+11 0
+.names outs_ready ins_ready[0]
+1 1
+.names outs_ready ins_ready[1]
+1 1
+.names outs_ready ins_ready[2]
+1 1
+.names outs_ready ins_ready[3]
+1 1
+.names outs_ready ins_ready[4]
+1 1
+.names outs_ready ins_ready[5]
+1 1
+.names outs_ready ins_ready[6]
+1 1
+.names outs_ready ins_ready[7]
+1 1
+.names outs_ready ins_ready[8]
+1 1
+.names outs_ready ins_ready[9]
+1 1
+.names outs_ready ins_ready[10]
+1 1
+.names outs_ready ins_ready[11]
+1 1
+.end

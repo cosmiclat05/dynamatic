@@ -1,0 +1,14 @@
+# Benchmark "trunci" written by ABC on Sat Oct 19 00:59:58 2024
+.model trunci
+.inputs clk rst ins[0] ins[1] ins[2] ins[3] ins[4] ins[5] ins_valid \
+ outs_ready
+.outputs outs[0] outs[1] outs_valid ins_ready
+.names ins_valid outs_ready ins_ready
+10 0
+.names ins[0] outs[0]
+1 1
+.names ins[1] outs[1]
+1 1
+.names ins_valid outs_valid
+1 1
+.end

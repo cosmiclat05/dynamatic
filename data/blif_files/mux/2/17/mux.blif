@@ -1,0 +1,441 @@
+# Benchmark "mux" written by ABC on Sat Oct 19 01:02:14 2024
+.model mux
+.inputs clk rst ins[0] ins[1] ins[2] ins[3] ins[4] ins[5] ins[6] ins[7] \
+ ins[8] ins[9] ins[10] ins[11] ins[12] ins[13] ins[14] ins[15] ins[16] \
+ ins[17] ins[18] ins[19] ins[20] ins[21] ins[22] ins[23] ins[24] ins[25] \
+ ins[26] ins[27] ins[28] ins[29] ins[30] ins[31] ins[32] ins[33] \
+ ins_valid[0] ins_valid[1] index index_valid outs_ready
+.outputs ins_ready[0] ins_ready[1] index_ready outs[0] outs[1] outs[2] \
+ outs[3] outs[4] outs[5] outs[6] outs[7] outs[8] outs[9] outs[10] outs[11] \
+ outs[12] outs[13] outs[14] outs[15] outs[16] outs_valid
+
+.latch       n126 tehb_inst.dataReg[0]  0
+.latch       n131 tehb_inst.dataReg[1]  0
+.latch       n136 tehb_inst.dataReg[2]  0
+.latch       n141 tehb_inst.dataReg[3]  0
+.latch       n146 tehb_inst.dataReg[4]  0
+.latch       n151 tehb_inst.dataReg[5]  0
+.latch       n156 tehb_inst.dataReg[6]  0
+.latch       n161 tehb_inst.dataReg[7]  0
+.latch       n166 tehb_inst.dataReg[8]  0
+.latch       n171 tehb_inst.dataReg[9]  0
+.latch       n176 tehb_inst.dataReg[10]  0
+.latch       n181 tehb_inst.dataReg[11]  0
+.latch       n186 tehb_inst.dataReg[12]  0
+.latch       n191 tehb_inst.dataReg[13]  0
+.latch       n196 tehb_inst.dataReg[14]  0
+.latch       n201 tehb_inst.dataReg[15]  0
+.latch       n206 tehb_inst.dataReg[16]  0
+.latch       n211 tehb_inst.control.fullReg  0
+
+.names ins_valid[0] index new_n117
+10 1
+.names index_valid new_n117 new_n118
+11 1
+.names tehb_inst.control.fullReg new_n118 new_n119
+01 1
+.names ins_valid[0] new_n119 new_n120
+10 1
+.names rst new_n120 ins_ready[0]
+00 1
+.names ins_valid[1] index new_n122
+11 1
+.names index_valid new_n122 new_n123
+11 1
+.names tehb_inst.control.fullReg new_n123 new_n124
+01 1
+.names ins_valid[1] new_n124 new_n125
+10 1
+.names rst new_n125 ins_ready[1]
+00 1
+.names new_n118 new_n123 new_n127
+00 1
+.names rst new_n127 new_n128
+00 1
+.names tehb_inst.control.fullReg new_n128 new_n129
+01 1
+.names index_valid new_n129 index_ready
+10 0
+.names tehb_inst.dataReg[0] tehb_inst.control.fullReg new_n131_1
+11 1
+.names ins[0] new_n123 new_n132
+10 1
+.names ins[17] new_n123 new_n133
+11 1
+.names new_n132 new_n133 new_n134
+00 1
+.names rst new_n134 new_n135
+00 1
+.names tehb_inst.control.fullReg new_n135 new_n136_1
+01 1
+.names new_n131_1 new_n136_1 outs[0]
+00 0
+.names tehb_inst.dataReg[1] tehb_inst.control.fullReg new_n138
+11 1
+.names ins[1] new_n123 new_n139
+10 1
+.names ins[18] new_n123 new_n140
+11 1
+.names new_n139 new_n140 new_n141_1
+00 1
+.names rst new_n141_1 new_n142
+00 1
+.names tehb_inst.control.fullReg new_n142 new_n143
+01 1
+.names new_n138 new_n143 outs[1]
+00 0
+.names tehb_inst.dataReg[2] tehb_inst.control.fullReg new_n145
+11 1
+.names ins[2] new_n123 new_n146_1
+10 1
+.names ins[19] new_n123 new_n147
+11 1
+.names new_n146_1 new_n147 new_n148
+00 1
+.names rst new_n148 new_n149
+00 1
+.names tehb_inst.control.fullReg new_n149 new_n150
+01 1
+.names new_n145 new_n150 outs[2]
+00 0
+.names tehb_inst.dataReg[3] tehb_inst.control.fullReg new_n152
+11 1
+.names ins[3] new_n123 new_n153
+10 1
+.names ins[20] new_n123 new_n154
+11 1
+.names new_n153 new_n154 new_n155
+00 1
+.names rst new_n155 new_n156_1
+00 1
+.names tehb_inst.control.fullReg new_n156_1 new_n157
+01 1
+.names new_n152 new_n157 outs[3]
+00 0
+.names tehb_inst.dataReg[4] tehb_inst.control.fullReg new_n159
+11 1
+.names ins[4] new_n123 new_n160
+10 1
+.names ins[21] new_n123 new_n161_1
+11 1
+.names new_n160 new_n161_1 new_n162
+00 1
+.names rst new_n162 new_n163
+00 1
+.names tehb_inst.control.fullReg new_n163 new_n164
+01 1
+.names new_n159 new_n164 outs[4]
+00 0
+.names tehb_inst.dataReg[5] tehb_inst.control.fullReg new_n166_1
+11 1
+.names ins[5] new_n123 new_n167
+10 1
+.names ins[22] new_n123 new_n168
+11 1
+.names new_n167 new_n168 new_n169
+00 1
+.names rst new_n169 new_n170
+00 1
+.names tehb_inst.control.fullReg new_n170 new_n171_1
+01 1
+.names new_n166_1 new_n171_1 outs[5]
+00 0
+.names tehb_inst.dataReg[6] tehb_inst.control.fullReg new_n173
+11 1
+.names ins[6] new_n123 new_n174
+10 1
+.names ins[23] new_n123 new_n175
+11 1
+.names new_n174 new_n175 new_n176_1
+00 1
+.names rst new_n176_1 new_n177
+00 1
+.names tehb_inst.control.fullReg new_n177 new_n178
+01 1
+.names new_n173 new_n178 outs[6]
+00 0
+.names tehb_inst.dataReg[7] tehb_inst.control.fullReg new_n180
+11 1
+.names ins[7] new_n123 new_n181_1
+10 1
+.names ins[24] new_n123 new_n182
+11 1
+.names new_n181_1 new_n182 new_n183
+00 1
+.names rst new_n183 new_n184
+00 1
+.names tehb_inst.control.fullReg new_n184 new_n185
+01 1
+.names new_n180 new_n185 outs[7]
+00 0
+.names tehb_inst.dataReg[8] tehb_inst.control.fullReg new_n187
+11 1
+.names ins[8] new_n123 new_n188
+10 1
+.names ins[25] new_n123 new_n189
+11 1
+.names new_n188 new_n189 new_n190
+00 1
+.names rst new_n190 new_n191_1
+00 1
+.names tehb_inst.control.fullReg new_n191_1 new_n192
+01 1
+.names new_n187 new_n192 outs[8]
+00 0
+.names tehb_inst.dataReg[9] tehb_inst.control.fullReg new_n194
+11 1
+.names ins[9] new_n123 new_n195
+10 1
+.names ins[26] new_n123 new_n196_1
+11 1
+.names new_n195 new_n196_1 new_n197
+00 1
+.names rst new_n197 new_n198
+00 1
+.names tehb_inst.control.fullReg new_n198 new_n199
+01 1
+.names new_n194 new_n199 outs[9]
+00 0
+.names tehb_inst.dataReg[10] tehb_inst.control.fullReg new_n201_1
+11 1
+.names ins[10] new_n123 new_n202
+10 1
+.names ins[27] new_n123 new_n203
+11 1
+.names new_n202 new_n203 new_n204
+00 1
+.names rst new_n204 new_n205
+00 1
+.names tehb_inst.control.fullReg new_n205 new_n206_1
+01 1
+.names new_n201_1 new_n206_1 outs[10]
+00 0
+.names tehb_inst.dataReg[11] tehb_inst.control.fullReg new_n208
+11 1
+.names ins[11] new_n123 new_n209
+10 1
+.names ins[28] new_n123 new_n210
+11 1
+.names new_n209 new_n210 new_n211_1
+00 1
+.names rst new_n211_1 new_n212
+00 1
+.names tehb_inst.control.fullReg new_n212 new_n213
+01 1
+.names new_n208 new_n213 outs[11]
+00 0
+.names tehb_inst.dataReg[12] tehb_inst.control.fullReg new_n215
+11 1
+.names ins[12] new_n123 new_n216
+10 1
+.names ins[29] new_n123 new_n217
+11 1
+.names new_n216 new_n217 new_n218
+00 1
+.names rst new_n218 new_n219
+00 1
+.names tehb_inst.control.fullReg new_n219 new_n220
+01 1
+.names new_n215 new_n220 outs[12]
+00 0
+.names tehb_inst.dataReg[13] tehb_inst.control.fullReg new_n222
+11 1
+.names ins[13] new_n123 new_n223
+10 1
+.names ins[30] new_n123 new_n224
+11 1
+.names new_n223 new_n224 new_n225
+00 1
+.names rst new_n225 new_n226
+00 1
+.names tehb_inst.control.fullReg new_n226 new_n227
+01 1
+.names new_n222 new_n227 outs[13]
+00 0
+.names tehb_inst.dataReg[14] tehb_inst.control.fullReg new_n229
+11 1
+.names ins[14] new_n123 new_n230
+10 1
+.names ins[31] new_n123 new_n231
+11 1
+.names new_n230 new_n231 new_n232
+00 1
+.names rst new_n232 new_n233
+00 1
+.names tehb_inst.control.fullReg new_n233 new_n234
+01 1
+.names new_n229 new_n234 outs[14]
+00 0
+.names tehb_inst.dataReg[15] tehb_inst.control.fullReg new_n236
+11 1
+.names ins[15] new_n123 new_n237
+10 1
+.names ins[32] new_n123 new_n238
+11 1
+.names new_n237 new_n238 new_n239
+00 1
+.names rst new_n239 new_n240
+00 1
+.names tehb_inst.control.fullReg new_n240 new_n241
+01 1
+.names new_n236 new_n241 outs[15]
+00 0
+.names tehb_inst.dataReg[16] tehb_inst.control.fullReg new_n243
+11 1
+.names ins[16] new_n123 new_n244
+10 1
+.names ins[33] new_n123 new_n245
+11 1
+.names new_n244 new_n245 new_n246
+00 1
+.names rst new_n246 new_n247
+00 1
+.names tehb_inst.control.fullReg new_n247 new_n248
+01 1
+.names new_n243 new_n248 outs[16]
+00 0
+.names tehb_inst.control.fullReg new_n128 outs_valid
+00 0
+.names outs_ready new_n129 new_n251
+01 1
+.names tehb_inst.dataReg[0] new_n251 new_n252
+10 1
+.names new_n135 new_n251 new_n253
+11 1
+.names new_n252 new_n253 new_n254
+00 1
+.names rst new_n254 n126
+00 1
+.names tehb_inst.dataReg[1] new_n251 new_n256
+10 1
+.names new_n142 new_n251 new_n257
+11 1
+.names new_n256 new_n257 new_n258
+00 1
+.names rst new_n258 n131
+00 1
+.names tehb_inst.dataReg[2] new_n251 new_n260
+10 1
+.names new_n149 new_n251 new_n261
+11 1
+.names new_n260 new_n261 new_n262
+00 1
+.names rst new_n262 n136
+00 1
+.names tehb_inst.dataReg[3] new_n251 new_n264
+10 1
+.names new_n156_1 new_n251 new_n265
+11 1
+.names new_n264 new_n265 new_n266
+00 1
+.names rst new_n266 n141
+00 1
+.names tehb_inst.dataReg[4] new_n251 new_n268
+10 1
+.names new_n163 new_n251 new_n269
+11 1
+.names new_n268 new_n269 new_n270
+00 1
+.names rst new_n270 n146
+00 1
+.names tehb_inst.dataReg[5] new_n251 new_n272
+10 1
+.names new_n170 new_n251 new_n273
+11 1
+.names new_n272 new_n273 new_n274
+00 1
+.names rst new_n274 n151
+00 1
+.names tehb_inst.dataReg[6] new_n251 new_n276
+10 1
+.names new_n177 new_n251 new_n277
+11 1
+.names new_n276 new_n277 new_n278
+00 1
+.names rst new_n278 n156
+00 1
+.names tehb_inst.dataReg[7] new_n251 new_n280
+10 1
+.names new_n184 new_n251 new_n281
+11 1
+.names new_n280 new_n281 new_n282
+00 1
+.names rst new_n282 n161
+00 1
+.names tehb_inst.dataReg[8] new_n251 new_n284
+10 1
+.names new_n191_1 new_n251 new_n285
+11 1
+.names new_n284 new_n285 new_n286
+00 1
+.names rst new_n286 n166
+00 1
+.names tehb_inst.dataReg[9] new_n251 new_n288
+10 1
+.names new_n198 new_n251 new_n289
+11 1
+.names new_n288 new_n289 new_n290
+00 1
+.names rst new_n290 n171
+00 1
+.names tehb_inst.dataReg[10] new_n251 new_n292
+10 1
+.names new_n205 new_n251 new_n293
+11 1
+.names new_n292 new_n293 new_n294
+00 1
+.names rst new_n294 n176
+00 1
+.names tehb_inst.dataReg[11] new_n251 new_n296
+10 1
+.names new_n212 new_n251 new_n297
+11 1
+.names new_n296 new_n297 new_n298
+00 1
+.names rst new_n298 n181
+00 1
+.names tehb_inst.dataReg[12] new_n251 new_n300
+10 1
+.names new_n219 new_n251 new_n301
+11 1
+.names new_n300 new_n301 new_n302
+00 1
+.names rst new_n302 n186
+00 1
+.names tehb_inst.dataReg[13] new_n251 new_n304
+10 1
+.names new_n226 new_n251 new_n305
+11 1
+.names new_n304 new_n305 new_n306
+00 1
+.names rst new_n306 n191
+00 1
+.names tehb_inst.dataReg[14] new_n251 new_n308
+10 1
+.names new_n233 new_n251 new_n309
+11 1
+.names new_n308 new_n309 new_n310
+00 1
+.names rst new_n310 n196
+00 1
+.names tehb_inst.dataReg[15] new_n251 new_n312
+10 1
+.names new_n240 new_n251 new_n313
+11 1
+.names new_n312 new_n313 new_n314
+00 1
+.names rst new_n314 n201
+00 1
+.names tehb_inst.dataReg[16] new_n251 new_n316
+10 1
+.names new_n247 new_n251 new_n317
+11 1
+.names new_n316 new_n317 new_n318
+00 1
+.names rst new_n318 n206
+00 1
+.names rst outs_ready new_n320
+00 1
+.names outs_valid new_n320 n211
+11 1
+.end

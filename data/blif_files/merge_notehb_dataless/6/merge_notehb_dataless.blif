@@ -1,0 +1,29 @@
+# Benchmark "merge_notehb_dataless" written by ABC on Sat Oct 19 00:44:31 2024
+.model merge_notehb_dataless
+.inputs clk rst ins_valid[0] ins_valid[1] ins_valid[2] ins_valid[3] \
+ ins_valid[4] ins_valid[5] outs_ready
+.outputs ins_ready[0] ins_ready[1] ins_ready[2] ins_ready[3] ins_ready[4] \
+ ins_ready[5] outs_valid
+.names ins_valid[0] ins_valid[1] new_n17
+00 1
+.names ins_valid[2] ins_valid[3] new_n18
+00 1
+.names ins_valid[4] ins_valid[5] new_n19
+00 1
+.names new_n18 new_n19 new_n20
+11 1
+.names new_n17 new_n20 outs_valid
+11 0
+.names outs_ready ins_ready[0]
+1 1
+.names outs_ready ins_ready[1]
+1 1
+.names outs_ready ins_ready[2]
+1 1
+.names outs_ready ins_ready[3]
+1 1
+.names outs_ready ins_ready[4]
+1 1
+.names outs_ready ins_ready[5]
+1 1
+.end

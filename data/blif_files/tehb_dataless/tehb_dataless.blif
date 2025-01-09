@@ -1,0 +1,16 @@
+# Benchmark "tehb_dataless" written by ABC on Sat Oct 19 01:02:24 2024
+.model tehb_dataless
+.inputs clk rst ins_valid outs_ready
+.outputs ins_ready outs_valid
+
+.latch        n14    fullReg  0
+
+.names ins_valid fullReg outs_valid
+00 0
+.names rst outs_ready new_n11
+00 1
+.names outs_valid new_n11 n14
+11 1
+.names fullReg ins_ready
+0 1
+.end

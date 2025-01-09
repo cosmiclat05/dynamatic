@@ -1,0 +1,70 @@
+# Benchmark "ofifo_dataless" written by ABC on Sat Oct 19 00:42:17 2024
+.model ofifo_dataless
+.inputs clk rst ins_valid outs_ready
+.outputs ins_ready outs_valid
+
+.latch        n14 fifo.Empty  0
+.latch        n19  fifo.Full  0
+.latch        n24  fifo.Head  0
+.latch        n29  fifo.Tail  0
+.latch        n34 tehb.fullReg  0
+
+.names fifo.Head fifo.Tail new_n22
+00 1
+.names fifo.Head fifo.Tail new_n23
+11 1
+.names new_n22 new_n23 new_n24_1
+00 1
+.names ins_valid tehb.fullReg new_n25
+00 1
+.names outs_ready fifo.Full new_n26
+01 1
+.names new_n25 new_n26 new_n27
+00 1
+.names outs_ready fifo.Empty new_n28
+10 1
+.names new_n27 new_n28 new_n29_1
+01 1
+.names new_n24_1 new_n29_1 new_n30
+11 1
+.names fifo.Empty new_n27 new_n31
+10 1
+.names rst new_n31 new_n32
+00 1
+.names new_n30 new_n32 n14
+01 0
+.names new_n24_1 new_n28 new_n34_1
+10 1
+.names new_n27 new_n34_1 new_n35
+11 1
+.names fifo.Full new_n35 new_n36
+00 1
+.names rst new_n29_1 new_n37
+00 1
+.names new_n36 new_n37 n19
+01 1
+.names fifo.Head new_n28 new_n39
+10 1
+.names fifo.Head new_n28 new_n40
+01 1
+.names new_n39 new_n40 new_n41
+00 1
+.names rst new_n41 n24
+00 1
+.names fifo.Tail new_n27 new_n43
+10 1
+.names fifo.Tail new_n27 new_n44
+01 1
+.names new_n43 new_n44 new_n45
+00 1
+.names rst new_n45 n29
+00 1
+.names rst new_n25 new_n47
+00 1
+.names new_n26 new_n47 n34
+11 1
+.names tehb.fullReg ins_ready
+0 1
+.names fifo.Empty outs_valid
+0 1
+.end

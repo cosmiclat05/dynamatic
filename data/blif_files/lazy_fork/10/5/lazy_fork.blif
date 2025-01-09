@@ -1,0 +1,187 @@
+# Benchmark "lazy_fork" written by ABC on Sat Oct 19 00:46:33 2024
+.model lazy_fork
+.inputs clk rst ins[0] ins[1] ins[2] ins[3] ins[4] ins_valid outs_ready[0] \
+ outs_ready[1] outs_ready[2] outs_ready[3] outs_ready[4] outs_ready[5] \
+ outs_ready[6] outs_ready[7] outs_ready[8] outs_ready[9]
+.outputs ins_ready outs[0] outs[1] outs[2] outs[3] outs[4] outs[5] outs[6] \
+ outs[7] outs[8] outs[9] outs[10] outs[11] outs[12] outs[13] outs[14] \
+ outs[15] outs[16] outs[17] outs[18] outs[19] outs[20] outs[21] outs[22] \
+ outs[23] outs[24] outs[25] outs[26] outs[27] outs[28] outs[29] outs[30] \
+ outs[31] outs[32] outs[33] outs[34] outs[35] outs[36] outs[37] outs[38] \
+ outs[39] outs[40] outs[41] outs[42] outs[43] outs[44] outs[45] outs[46] \
+ outs[47] outs[48] outs[49] outs_valid[0] outs_valid[1] outs_valid[2] \
+ outs_valid[3] outs_valid[4] outs_valid[5] outs_valid[6] outs_valid[7] \
+ outs_valid[8] outs_valid[9]
+.names outs_ready[8] outs_ready[9] new_n80
+11 1
+.names outs_ready[0] outs_ready[1] new_n81
+11 1
+.names outs_ready[2] new_n81 new_n82
+11 1
+.names outs_ready[3] new_n82 new_n83
+11 1
+.names outs_ready[4] new_n83 new_n84
+11 1
+.names outs_ready[5] new_n84 new_n85
+11 1
+.names outs_ready[6] new_n85 new_n86
+11 1
+.names outs_ready[7] new_n86 new_n87
+11 1
+.names new_n80 new_n87 ins_ready
+11 1
+.names outs_ready[5] outs_ready[6] new_n89
+11 1
+.names outs_ready[7] new_n89 new_n90
+11 1
+.names outs_ready[4] new_n90 new_n91
+11 1
+.names ins_valid new_n80 new_n92
+11 1
+.names outs_ready[2] outs_ready[3] new_n93
+11 1
+.names outs_ready[1] new_n93 new_n94
+11 1
+.names new_n92 new_n94 new_n95
+11 1
+.names new_n91 new_n95 outs_valid[0]
+11 1
+.names outs_ready[0] new_n93 new_n97
+11 1
+.names new_n92 new_n97 new_n98
+11 1
+.names new_n91 new_n98 outs_valid[1]
+11 1
+.names outs_ready[3] new_n81 new_n100
+11 1
+.names new_n92 new_n100 new_n101
+11 1
+.names new_n91 new_n101 outs_valid[2]
+11 1
+.names new_n82 new_n92 new_n103
+11 1
+.names new_n91 new_n103 outs_valid[3]
+11 1
+.names new_n90 new_n92 new_n105
+11 1
+.names new_n83 new_n105 outs_valid[4]
+11 1
+.names outs_ready[7] new_n92 new_n107
+11 1
+.names outs_ready[6] new_n107 new_n108
+11 1
+.names new_n84 new_n108 outs_valid[5]
+11 1
+.names new_n85 new_n107 outs_valid[6]
+11 1
+.names new_n86 new_n92 outs_valid[7]
+11 1
+.names ins_valid outs_ready[9] new_n112
+11 1
+.names new_n87 new_n112 outs_valid[8]
+11 1
+.names ins_valid outs_ready[8] new_n114
+11 1
+.names new_n87 new_n114 outs_valid[9]
+11 1
+.names ins[0] outs[0]
+1 1
+.names ins[1] outs[1]
+1 1
+.names ins[2] outs[2]
+1 1
+.names ins[3] outs[3]
+1 1
+.names ins[4] outs[4]
+1 1
+.names ins[0] outs[5]
+1 1
+.names ins[1] outs[6]
+1 1
+.names ins[2] outs[7]
+1 1
+.names ins[3] outs[8]
+1 1
+.names ins[4] outs[9]
+1 1
+.names ins[0] outs[10]
+1 1
+.names ins[1] outs[11]
+1 1
+.names ins[2] outs[12]
+1 1
+.names ins[3] outs[13]
+1 1
+.names ins[4] outs[14]
+1 1
+.names ins[0] outs[15]
+1 1
+.names ins[1] outs[16]
+1 1
+.names ins[2] outs[17]
+1 1
+.names ins[3] outs[18]
+1 1
+.names ins[4] outs[19]
+1 1
+.names ins[0] outs[20]
+1 1
+.names ins[1] outs[21]
+1 1
+.names ins[2] outs[22]
+1 1
+.names ins[3] outs[23]
+1 1
+.names ins[4] outs[24]
+1 1
+.names ins[0] outs[25]
+1 1
+.names ins[1] outs[26]
+1 1
+.names ins[2] outs[27]
+1 1
+.names ins[3] outs[28]
+1 1
+.names ins[4] outs[29]
+1 1
+.names ins[0] outs[30]
+1 1
+.names ins[1] outs[31]
+1 1
+.names ins[2] outs[32]
+1 1
+.names ins[3] outs[33]
+1 1
+.names ins[4] outs[34]
+1 1
+.names ins[0] outs[35]
+1 1
+.names ins[1] outs[36]
+1 1
+.names ins[2] outs[37]
+1 1
+.names ins[3] outs[38]
+1 1
+.names ins[4] outs[39]
+1 1
+.names ins[0] outs[40]
+1 1
+.names ins[1] outs[41]
+1 1
+.names ins[2] outs[42]
+1 1
+.names ins[3] outs[43]
+1 1
+.names ins[4] outs[44]
+1 1
+.names ins[0] outs[45]
+1 1
+.names ins[1] outs[46]
+1 1
+.names ins[2] outs[47]
+1 1
+.names ins[3] outs[48]
+1 1
+.names ins[4] outs[49]
+1 1
+.end

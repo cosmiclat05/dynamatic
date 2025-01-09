@@ -1,0 +1,15 @@
+# Benchmark "extsi" written by ABC on Sat Oct 19 00:56:05 2024
+.model extsi
+.inputs clk rst ins[0] ins[1] ins[2] ins[3] ins[4] ins[5] ins[6] ins[7] \
+ ins[8] ins[9] ins[10] ins[11] ins[12] ins[13] ins[14] ins[15] ins[16] \
+ ins[17] ins[18] ins[19] ins[20] ins_valid outs_ready
+.outputs ins_ready outs[0] outs[1] outs_valid
+.names outs_ready ins_ready
+1 1
+.names ins[0] outs[0]
+1 1
+.names ins[1] outs[1]
+1 1
+.names ins_valid outs_valid
+1 1
+.end

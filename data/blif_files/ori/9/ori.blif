@@ -1,0 +1,32 @@
+# Benchmark "ori" written by ABC on Sat Oct 19 00:40:52 2024
+.model ori
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs[4] lhs[5] lhs[6] lhs[7] \
+ lhs[8] lhs_valid rhs[0] rhs[1] rhs[2] rhs[3] rhs[4] rhs[5] rhs[6] rhs[7] \
+ rhs[8] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result[5] \
+ result[6] result[7] result[8] result_valid lhs_ready rhs_ready
+.names lhs[0] rhs[0] result[0]
+00 0
+.names lhs[1] rhs[1] result[1]
+00 0
+.names lhs[2] rhs[2] result[2]
+00 0
+.names lhs[3] rhs[3] result[3]
+00 0
+.names lhs[4] rhs[4] result[4]
+00 0
+.names lhs[5] rhs[5] result[5]
+00 0
+.names lhs[6] rhs[6] result[6]
+00 0
+.names lhs[7] rhs[7] result[7]
+00 0
+.names lhs[8] rhs[8] result[8]
+00 0
+.names lhs_valid rhs_valid result_valid
+11 1
+.names rhs_valid result_ready lhs_ready
+11 1
+.names lhs_valid result_ready rhs_ready
+11 1
+.end

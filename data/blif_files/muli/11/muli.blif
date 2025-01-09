@@ -1,0 +1,10 @@
+# Benchmark "muli" written by ABC on Sat Oct 19 00:40:52 2024
+.model muli
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs[4] lhs[5] lhs[6] lhs[7] \
+ lhs[8] lhs[9] lhs[10] lhs_valid rhs[0] rhs[1] rhs[2] rhs[3] rhs[4] rhs[5] \
+ rhs[6] rhs[7] rhs[8] rhs[9] rhs[10] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result[5] \
+ result[6] result[7] result[8] result[9] result[10] result_valid lhs_ready \
+ rhs_ready
+
+.end

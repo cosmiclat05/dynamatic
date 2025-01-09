@@ -1,0 +1,78 @@
+# Benchmark "control_merge_dataless" written by ABC on Sat Oct 19 00:54:23 2024
+.model control_merge_dataless
+.inputs clk rst ins_valid[0] ins_valid[1] ins_valid[2] outs_ready \
+ index_ready
+.outputs ins_ready[0] ins_ready[1] ins_ready[2] outs_valid index[0] \
+ index[1] index_valid
+
+.latch        n30 fork_dataless.regBlock[0].regblock.transmitValue  1
+.latch        n35 fork_dataless.regBlock[1].regblock.transmitValue  1
+.latch        n40 tehb.dataReg[0]  0
+.latch        n45 tehb.dataReg[1]  0
+.latch        n50 tehb.control.fullReg  0
+
+.names ins_valid[0] ins_valid[1] new_n30_1
+00 1
+.names ins_valid[2] new_n30_1 new_n31
+01 1
+.names tehb.control.fullReg new_n31 new_n32
+01 1
+.names fork_dataless.regBlock[0].regblock.transmitValue new_n32 outs_valid
+10 1
+.names tehb.dataReg[0] tehb.control.fullReg new_n34
+11 1
+.names ins_valid[1] ins_valid[2] new_n35_1
+10 1
+.names tehb.control.fullReg new_n35_1 new_n36
+01 1
+.names new_n34 new_n36 index[0]
+00 0
+.names tehb.dataReg[1] tehb.control.fullReg new_n38
+11 1
+.names ins_valid[2] tehb.control.fullReg new_n39
+10 1
+.names new_n38 new_n39 index[1]
+00 0
+.names fork_dataless.regBlock[1].regblock.transmitValue new_n32 index_valid
+10 1
+.names outs_ready fork_dataless.regBlock[0].regblock.transmitValue new_n42
+01 1
+.names index_ready fork_dataless.regBlock[1].regblock.transmitValue new_n43
+01 1
+.names new_n42 new_n43 new_n44
+00 1
+.names rst new_n44 new_n45_1
+00 1
+.names new_n32 new_n45_1 n50
+01 1
+.names new_n42 n50 n30
+01 0
+.names new_n43 n50 n35
+01 0
+.names tehb.control.fullReg new_n31 new_n49
+00 1
+.names new_n44 new_n49 new_n50_1
+01 1
+.names tehb.dataReg[0] new_n50_1 new_n51
+10 1
+.names new_n35_1 new_n50_1 new_n52
+11 1
+.names new_n51 new_n52 new_n53
+00 1
+.names rst new_n53 n40
+00 1
+.names tehb.dataReg[1] new_n50_1 new_n55
+10 1
+.names ins_valid[2] new_n50_1 new_n56
+11 1
+.names new_n55 new_n56 new_n57
+00 1
+.names rst new_n57 n45
+00 1
+.names tehb.control.fullReg ins_ready[0]
+0 1
+.names ins_ready[0] ins_ready[1]
+1 1
+.names ins_ready[0] ins_ready[2]
+1 1
+.end

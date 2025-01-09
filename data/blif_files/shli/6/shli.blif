@@ -1,0 +1,113 @@
+# Benchmark "shli" written by ABC on Sat Oct 19 00:40:57 2024
+.model shli
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs[4] lhs[5] lhs_valid rhs[0] \
+ rhs[1] rhs[2] rhs[3] rhs[4] rhs[5] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result[5] \
+ result_valid lhs_ready rhs_ready
+.names rhs[4] rhs[5] new_n27
+00 1
+.names lhs[0] new_n27 new_n28
+11 1
+.names rhs[0] new_n28 new_n29
+01 1
+.names rhs[1] new_n29 new_n30
+01 1
+.names rhs[2] rhs[3] new_n31
+00 1
+.names new_n30 new_n31 result[0]
+11 1
+.names lhs[1] new_n27 new_n33
+11 1
+.names rhs[0] new_n33 new_n34
+01 1
+.names rhs[0] new_n28 new_n35
+11 1
+.names new_n34 new_n35 new_n36
+00 1
+.names rhs[1] new_n36 new_n37
+00 1
+.names new_n31 new_n37 result[1]
+11 1
+.names lhs[2] new_n27 new_n39
+11 1
+.names rhs[0] new_n39 new_n40
+01 1
+.names rhs[0] new_n33 new_n41
+11 1
+.names new_n40 new_n41 new_n42
+00 1
+.names rhs[1] new_n42 new_n43
+00 1
+.names rhs[1] new_n29 new_n44
+11 1
+.names new_n43 new_n44 new_n45
+00 1
+.names new_n31 new_n45 result[2]
+10 1
+.names lhs[3] new_n27 new_n47
+11 1
+.names rhs[0] new_n47 new_n48
+01 1
+.names rhs[0] new_n39 new_n49
+11 1
+.names new_n48 new_n49 new_n50
+00 1
+.names rhs[1] new_n50 new_n51
+00 1
+.names rhs[1] new_n36 new_n52
+10 1
+.names new_n51 new_n52 new_n53
+00 1
+.names new_n31 new_n53 result[3]
+10 1
+.names lhs[4] new_n27 new_n55
+11 1
+.names rhs[0] new_n55 new_n56
+01 1
+.names rhs[0] new_n47 new_n57
+11 1
+.names new_n56 new_n57 new_n58
+00 1
+.names rhs[1] new_n58 new_n59
+00 1
+.names rhs[1] new_n42 new_n60
+10 1
+.names new_n59 new_n60 new_n61
+00 1
+.names rhs[2] new_n61 new_n62
+00 1
+.names rhs[2] new_n30 new_n63
+11 1
+.names new_n62 new_n63 new_n64
+00 1
+.names rhs[3] new_n64 result[4]
+00 1
+.names lhs[5] rhs[0] new_n66
+10 1
+.names new_n27 new_n66 new_n67
+11 1
+.names rhs[0] new_n55 new_n68
+11 1
+.names new_n67 new_n68 new_n69
+00 1
+.names rhs[1] new_n69 new_n70
+00 1
+.names rhs[1] new_n50 new_n71
+10 1
+.names new_n70 new_n71 new_n72
+00 1
+.names rhs[2] new_n72 new_n73
+00 1
+.names rhs[2] new_n37 new_n74
+11 1
+.names new_n73 new_n74 new_n75
+00 1
+.names rhs[3] new_n75 result[5]
+00 1
+.names lhs_valid rhs_valid result_valid
+11 1
+.names rhs_valid result_ready lhs_ready
+11 1
+.names lhs_valid result_ready rhs_ready
+11 1
+.end

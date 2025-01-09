@@ -1,0 +1,217 @@
+# Benchmark "mc_load" written by ABC on Sat Oct 19 00:48:02 2024
+.model mc_load
+.inputs clk rst addrIn[0] addrIn[1] addrIn[2] addrIn[3] addrIn[4] addrIn[5] \
+ addrIn[6] addrIn[7] addrIn[8] addrIn[9] addrIn[10] addrIn_valid \
+ addrOut_ready dataFromMem dataFromMem_valid dataOut_ready
+.outputs addrIn_ready addrOut[0] addrOut[1] addrOut[2] addrOut[3] \
+ addrOut[4] addrOut[5] addrOut[6] addrOut[7] addrOut[8] addrOut[9] \
+ addrOut[10] addrOut_valid dataFromMem_ready dataOut dataOut_valid
+
+.latch        n70 addr_tehb.dataReg[0]  0
+.latch        n75 addr_tehb.dataReg[1]  0
+.latch        n80 addr_tehb.dataReg[2]  0
+.latch        n85 addr_tehb.dataReg[3]  0
+.latch        n90 addr_tehb.dataReg[4]  0
+.latch        n95 addr_tehb.dataReg[5]  0
+.latch       n100 addr_tehb.dataReg[6]  0
+.latch       n105 addr_tehb.dataReg[7]  0
+.latch       n110 addr_tehb.dataReg[8]  0
+.latch       n115 addr_tehb.dataReg[9]  0
+.latch       n120 addr_tehb.dataReg[10]  0
+.latch       n125 addr_tehb.control.fullReg  0
+.latch       n130 data_tehb.dataReg  0
+.latch       n135 data_tehb.control.fullReg  0
+
+.names addr_tehb.dataReg[0] addr_tehb.control.fullReg new_n77
+11 1
+.names addrIn[0] addr_tehb.control.fullReg new_n78
+10 1
+.names new_n77 new_n78 addrOut[0]
+00 0
+.names addr_tehb.dataReg[1] addr_tehb.control.fullReg new_n80_1
+11 1
+.names addrIn[1] addr_tehb.control.fullReg new_n81
+10 1
+.names new_n80_1 new_n81 addrOut[1]
+00 0
+.names addr_tehb.dataReg[2] addr_tehb.control.fullReg new_n83
+11 1
+.names addrIn[2] addr_tehb.control.fullReg new_n84
+10 1
+.names new_n83 new_n84 addrOut[2]
+00 0
+.names addr_tehb.dataReg[3] addr_tehb.control.fullReg new_n86
+11 1
+.names addrIn[3] addr_tehb.control.fullReg new_n87
+10 1
+.names new_n86 new_n87 addrOut[3]
+00 0
+.names addr_tehb.dataReg[4] addr_tehb.control.fullReg new_n89
+11 1
+.names addrIn[4] addr_tehb.control.fullReg new_n90_1
+10 1
+.names new_n89 new_n90_1 addrOut[4]
+00 0
+.names addr_tehb.dataReg[5] addr_tehb.control.fullReg new_n92
+11 1
+.names addrIn[5] addr_tehb.control.fullReg new_n93
+10 1
+.names new_n92 new_n93 addrOut[5]
+00 0
+.names addr_tehb.dataReg[6] addr_tehb.control.fullReg new_n95_1
+11 1
+.names addrIn[6] addr_tehb.control.fullReg new_n96
+10 1
+.names new_n95_1 new_n96 addrOut[6]
+00 0
+.names addr_tehb.dataReg[7] addr_tehb.control.fullReg new_n98
+11 1
+.names addrIn[7] addr_tehb.control.fullReg new_n99
+10 1
+.names new_n98 new_n99 addrOut[7]
+00 0
+.names addr_tehb.dataReg[8] addr_tehb.control.fullReg new_n101
+11 1
+.names addrIn[8] addr_tehb.control.fullReg new_n102
+10 1
+.names new_n101 new_n102 addrOut[8]
+00 0
+.names addr_tehb.dataReg[9] addr_tehb.control.fullReg new_n104
+11 1
+.names addrIn[9] addr_tehb.control.fullReg new_n105_1
+10 1
+.names new_n104 new_n105_1 addrOut[9]
+00 0
+.names addr_tehb.dataReg[10] addr_tehb.control.fullReg new_n107
+11 1
+.names addrIn[10] addr_tehb.control.fullReg new_n108
+10 1
+.names new_n107 new_n108 addrOut[10]
+00 0
+.names addrIn_valid addr_tehb.control.fullReg addrOut_valid
+00 0
+.names data_tehb.dataReg data_tehb.control.fullReg new_n111
+11 1
+.names dataFromMem data_tehb.control.fullReg new_n112
+10 1
+.names new_n111 new_n112 dataOut
+00 0
+.names dataFromMem_valid data_tehb.control.fullReg dataOut_valid
+00 0
+.names addrIn_valid addrOut_ready new_n115_1
+10 1
+.names addr_tehb.control.fullReg new_n115_1 new_n116
+01 1
+.names addr_tehb.dataReg[0] new_n116 new_n117
+10 1
+.names addrIn[0] new_n116 new_n118
+11 1
+.names new_n117 new_n118 new_n119
+00 1
+.names rst new_n119 n70
+00 1
+.names addr_tehb.dataReg[1] new_n116 new_n121
+10 1
+.names addrIn[1] new_n116 new_n122
+11 1
+.names new_n121 new_n122 new_n123
+00 1
+.names rst new_n123 n75
+00 1
+.names addr_tehb.dataReg[2] new_n116 new_n125_1
+10 1
+.names addrIn[2] new_n116 new_n126
+11 1
+.names new_n125_1 new_n126 new_n127
+00 1
+.names rst new_n127 n80
+00 1
+.names addr_tehb.dataReg[3] new_n116 new_n129
+10 1
+.names addrIn[3] new_n116 new_n130_1
+11 1
+.names new_n129 new_n130_1 new_n131
+00 1
+.names rst new_n131 n85
+00 1
+.names addr_tehb.dataReg[4] new_n116 new_n133
+10 1
+.names addrIn[4] new_n116 new_n134
+11 1
+.names new_n133 new_n134 new_n135_1
+00 1
+.names rst new_n135_1 n90
+00 1
+.names addr_tehb.dataReg[5] new_n116 new_n137
+10 1
+.names addrIn[5] new_n116 new_n138
+11 1
+.names new_n137 new_n138 new_n139
+00 1
+.names rst new_n139 n95
+00 1
+.names addr_tehb.dataReg[6] new_n116 new_n141
+10 1
+.names addrIn[6] new_n116 new_n142
+11 1
+.names new_n141 new_n142 new_n143
+00 1
+.names rst new_n143 n100
+00 1
+.names addr_tehb.dataReg[7] new_n116 new_n145
+10 1
+.names addrIn[7] new_n116 new_n146
+11 1
+.names new_n145 new_n146 new_n147
+00 1
+.names rst new_n147 n105
+00 1
+.names addr_tehb.dataReg[8] new_n116 new_n149
+10 1
+.names addrIn[8] new_n116 new_n150
+11 1
+.names new_n149 new_n150 new_n151
+00 1
+.names rst new_n151 n110
+00 1
+.names addr_tehb.dataReg[9] new_n116 new_n153
+10 1
+.names addrIn[9] new_n116 new_n154
+11 1
+.names new_n153 new_n154 new_n155
+00 1
+.names rst new_n155 n115
+00 1
+.names addr_tehb.dataReg[10] new_n116 new_n157
+10 1
+.names addrIn[10] new_n116 new_n158
+11 1
+.names new_n157 new_n158 new_n159
+00 1
+.names rst new_n159 n120
+00 1
+.names rst addrOut_ready new_n161
+00 1
+.names addrOut_valid new_n161 n125
+11 1
+.names dataFromMem_valid dataOut_ready new_n163
+10 1
+.names data_tehb.control.fullReg new_n163 new_n164
+01 1
+.names data_tehb.dataReg new_n164 new_n165
+10 1
+.names dataFromMem new_n164 new_n166
+11 1
+.names new_n165 new_n166 new_n167
+00 1
+.names rst new_n167 n130
+00 1
+.names rst dataOut_ready new_n169
+00 1
+.names dataOut_valid new_n169 n135
+11 1
+.names addr_tehb.control.fullReg addrIn_ready
+0 1
+.names data_tehb.control.fullReg dataFromMem_ready
+0 1
+.end
