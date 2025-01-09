@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// TODO: Add description.
+// Implements Subject Graph constructors.
 //
 //===-----------------------------------------------------------------===//
 
@@ -312,19 +312,51 @@ public:
   ChannelSignals &returnOutputNodes(unsigned int) override;
 };
 
+enum class BufferType { OEHB, TEHB };
+class BufferSubjectGraph;
+
+struct BufferPair {
+  BufferSubjectGraph *oehb;
+  BufferSubjectGraph *tehb;
+
+  BufferPair() : oehb(nullptr), tehb(nullptr) {}
+  BufferPair(BufferSubjectGraph *o, BufferSubjectGraph *t) : oehb(o), tehb(t) {}
+};
+
 class BufferSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
   ChannelSignals inputNodes;
   ChannelSignals outputNodes;
 
+  static std::string getBufferTypeName(BufferType type) {
+    switch (type) {
+    case BufferType::OEHB:
+      return "oehb";
+    case BufferType::TEHB:
+      return "tehb";
+    }
+  }
+
 public:
   BufferSubjectGraph(Operation *op);
-  BufferSubjectGraph(Operation *op1, Operation *op2, std::string &bufferType);
+  BufferSubjectGraph(Operation *op1, Operation *op2, std::string bufferType);
   BufferSubjectGraph(BufferSubjectGraph *graph1, Operation *op2,
-                     std::string &bufferType);
+                     std::string bufferType);
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int) override;
+
+  static BufferPair createBuffers(Operation *inputOp, Operation *outputOp) {
+    // Create OEHB buffer using the temporary string
+    BufferSubjectGraph *oehb = new BufferSubjectGraph(
+        inputOp, outputOp, getBufferTypeName(BufferType::OEHB));
+
+    // Create TEHB buffer that connects to OEHB
+    BufferSubjectGraph *tehb = new BufferSubjectGraph(
+        oehb, outputOp, getBufferTypeName(BufferType::TEHB));
+
+    return BufferPair(oehb, tehb);
+  }
 };
 
 class OperationDifferentiator {

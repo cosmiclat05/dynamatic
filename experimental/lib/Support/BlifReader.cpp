@@ -8,7 +8,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// TODO: Add description.
+// This file contains the functionality for reading a BLIF file into data
+// structures.
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,10 +26,6 @@ using namespace dynamatic::experimental;
 
 void Node::setName(const std::string &newName) {
   // If we do it like this, then the parent blif will not see the change
-
-  // if (parent) {
-  //   parent->renameNode(name, newName);
-  // }
   this->name = newName;
 }
 
@@ -364,5 +361,3 @@ void BlifData::printModuleInfo() {
   }
   llvm::errs() << "\n";
 }
-
-// BlifReader end

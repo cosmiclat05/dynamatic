@@ -391,12 +391,7 @@ void MAPBUFBuffers::addCutLoopbackBuffers() {
           }
 
           // Insert buffers in the Subject Graph
-          std::string oehbStr = "oehb";
-          std::string tehbStr = "tehb";
-          experimental::BufferSubjectGraph *oehb =
-              new experimental::BufferSubjectGraph(op, user, oehbStr);
-          experimental::BufferSubjectGraph *tehb =
-              new experimental::BufferSubjectGraph(oehb, user, tehbStr);
+          experimental::BufferSubjectGraph::createBuffers(op, user);
         }
       }
     }

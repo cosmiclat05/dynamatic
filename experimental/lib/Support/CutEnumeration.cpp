@@ -8,7 +8,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// TODO: Add description.
+// This file contains the declarations of cut enumeration algorithms and Cut
+// class.
 //
 //===----------------------------------------------------------------------===//
 
@@ -204,5 +205,3 @@ NodeToCuts CutManager::cutless(bool includeChannels) {
 
   return cutlessCuts;
 }
-
-// CutEnumeration end

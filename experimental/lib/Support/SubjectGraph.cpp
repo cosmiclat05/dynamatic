@@ -6,6 +6,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+//
+// Implements Subject Graph constructors.
+//
+//===----------------------------------------------------------------------===//
 
 #include "experimental/Support/SubjectGraph.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -998,7 +1002,7 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 }
 
 BufferSubjectGraph::BufferSubjectGraph(Operation *op1, Operation *op2,
-                                       std::string &bufferType)
+                                       std::string bufferType)
     : BaseSubjectGraph() {
   subjectGraphMap[this] = nullptr;
   moduleType = bufferType;
@@ -1046,7 +1050,7 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op1, Operation *op2,
 }
 
 BufferSubjectGraph::BufferSubjectGraph(BufferSubjectGraph *graph1,
-                                       Operation *op2, std::string &bufferType)
+                                       Operation *op2, std::string bufferType)
     : BaseSubjectGraph() {
   subjectGraphMap[this] = nullptr;
   moduleType = bufferType;

@@ -8,11 +8,11 @@
 //
 
 //
-// This mainly declares the `MAPBUFPlacement` class, which inherits the abstract
-// `BufferPlacementMILP` class to setup and solve a real MILP from which
-// buffering decisions can be made. Every public member declared in this file is
-// under the `dynamatic::buffer::mapbuf` namespace, as to not create name
-// conflicts for common structs with other implementors of
+// This mainly file declares the `MAPBUFPlacement` class, which inherits the
+// abstract `BufferPlacementMILP` class to setup and solve a real MILP from
+// which buffering decisions can be made. Every public member declared in this
+// file is under the `dynamatic::buffer::mapbuf` namespace, as to not create
+// name conflicts for common structs with other implementors of
 // `BufferPlacementMILP`.
 //
 //===----------------------------------------------------------------------===//
