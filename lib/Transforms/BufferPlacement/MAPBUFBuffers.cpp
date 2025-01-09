@@ -450,11 +450,7 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
 
   modelFeedback.update();
 
-  // if (!blifFile.empty())
-  //   modelFeedback.write(blifFile.str() + "_feedback_arc.lp");
-  // modelFeedback.optimize();
-  // if (!blifFile.empty())
-  //   modelFeedback.write(blifFile.str() + "_feedback_arc_solution.json");
+  modelFeedback.optimize();
 
   for (const auto &entry : edgeToOps) {
     auto edgeVar = entry.second;
@@ -482,13 +478,7 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
             }
 
             // Insert buffers in the Subject Graph
-            std::string oehbStr = "oehb";
-            std::string tehbStr = "tehb";
-            experimental::BufferSubjectGraph *oehb =
-                new experimental::BufferSubjectGraph(inputOp, outputOp,
-                                                     oehbStr);
-            experimental::BufferSubjectGraph *tehb =
-                new experimental::BufferSubjectGraph(oehb, outputOp, tehbStr);
+            experimental::BufferSubjectGraph::createBuffers(inputOp, outputOp);
           }
         }
       }
@@ -681,7 +671,7 @@ void MAPBUFBuffers::setup() {
                                                            blifFiles);
 
   // boolean to choose between different acyclic graph convertion methods
-  bool acyclicType = false;
+  bool acyclicType = true;
   if (!acyclicType) {
     addCutLoopbackBuffers();
   } else {
