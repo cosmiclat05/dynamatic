@@ -1,7 +1,0 @@
-# Benchmark "sink" written by ABC on Sat Oct 19 00:41:50 2024
-.model sink
-.inputs clk rst ins ins_valid
-.outputs ins_ready
-.names ins_ready
- 1
-.end

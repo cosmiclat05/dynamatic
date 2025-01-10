@@ -1,7 +1,0 @@
-# Benchmark "source" written by ABC on Sat Oct 19 01:02:23 2024
-.model source
-.inputs clk rst outs_ready
-.outputs outs_valid
-.names outs_valid
- 1
-.end
