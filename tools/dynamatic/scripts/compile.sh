@@ -104,13 +104,21 @@ exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 exit_on_fail "Failed to apply standard transformations to cf" \
   "Applied standard transformations to cf"
 
+# # cf transformations (dynamatic)
+# "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
+#   --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
+#   --mark-memory-interfaces \
+#   > "$F_CF_DYN_TRANSFORMED"
+# exit_on_fail "Failed to apply Dynamatic transformations to cf" \
+#   "Applied Dynamatic transformations to cf"
+
 # cf transformations (dynamatic)
 "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
-  --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
-  --mark-memory-interfaces \
-  > "$F_CF_DYN_TRANSFORMED"
+--arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
+--force-memory-interface="force-mc" \
+> "$F_CF_DYN_TRANSFORMED"
 exit_on_fail "Failed to apply Dynamatic transformations to cf" \
-  "Applied Dynamatic transformations to cf"
+"Applied Dynamatic transformations to cf"
 
 # cf level -> handshake level
 "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
