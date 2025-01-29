@@ -79,8 +79,6 @@ void MFASBuffers::addObjective() {
       auto dataIt = channelVars.signalVars.find(SignalType::DATA);
       if (dataIt != channelVars.signalVars.end()) {
         GRBVar &dataBuf = dataIt->second.bufPresent;
-        // If there is a data buffer on the channel, the channel elastic
-        // arrival time at the ouput must be greater than at the input
         obj += dataBuf;
       }
     }

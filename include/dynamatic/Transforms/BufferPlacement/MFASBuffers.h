@@ -1,5 +1,5 @@
-//===- MFASBuffers.h - Minimum Feedback Arc Set buffer placement
-//---------------*- C++ -*-===//
+//===- MFASBuffers.h - Minimum Feedback Arc Set buffer placement ---*- C++
+//-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Find the Minimum Feedback Arc Set (MFAS) in a dataflow graph, and places
+// Finds the Minimum Feedback Arc Set (MFAS) in a dataflow graph, and places
 // buffer on this arc set to minimize the number of buffers.
 //
 // This mainly declares the `MFAS` class, which inherits the abstract
@@ -43,15 +43,14 @@ namespace mfas {
 ///    were extracted from the function
 /// 5. a maximixation objective, that rewards high CFDFC throughputs and
 ///    penalizes the placement of many large buffers in the circuit
+
+/// Holds the state and logic for MFAS buffer placement.
+/// 1. Adds elasticity constraints
 class MFASBuffers : public BufferPlacementMILP {
 public:
   /// Setups the entire MILP that buffers the input dataflow circuit for the
   /// target clock period, after which (absent errors) it is ready for
-  /// optimization. The `legacyPlacemnt` controls the interpretation of the
-  /// MILP's results (non-legacy placement should yield faster circuits in
-  /// general). If a channel's buffering properties are provably unsatisfiable,
-  /// the MILP will not be marked ready for optimization, ensuring that further
-  /// calls to `optimize` fail.
+  /// optimization.
   MFASBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
               double targetPeriod);
 
@@ -63,12 +62,13 @@ public:
               StringRef milpName = "placement");
 
 protected:
-  // Interprets the MILP solution to derive buffer placement decisions. Places 1
-  // opaque and 1 transparent buffer on the channels that are in minimum
-  // feedback arc set.
+  /// Interprets the MILP solution to derive buffer placement decisions. Places
+  /// 1 opaque and 1 transparent buffer on the channels that are in minimum
+  /// feedback arc set.
   void extractResult(BufferPlacement &placement) override;
 
-  //
+  /// Adds the MILP model's objective to maximize. The objective is to minimize
+  /// the number of edges that needs to be removed.
   void addObjective();
 
 private:
