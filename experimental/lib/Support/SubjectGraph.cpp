@@ -685,9 +685,9 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
     handshake::TimingInfo info = timing.getInfo();
-    if (info == handshake::TimingInfo::oehb())
+    if (info == handshake::TimingInfo::break_dv())
       bufferType = "oehb";
-    if (info == handshake::TimingInfo::tehb())
+    if (info == handshake::TimingInfo::break_r())
       bufferType = "tehb";
   }
 

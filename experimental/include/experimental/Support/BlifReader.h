@@ -20,7 +20,6 @@
 #include "dynamatic/Support/LLVM.h"
 #include "gurobi_c++.h"
 #include "llvm/Support/raw_ostream.h"
-#include <boost/functional/hash/extensions.hpp>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -92,7 +91,6 @@ public:
     regOutputNode->isLatchOutput = true;
   }
 
-  // Replaces an existing fanin with a new one.
   void replaceFanin(Node *oldFanin, Node *newFanin) {
     fanins.erase(oldFanin);
     fanins.insert(newFanin);
@@ -148,6 +146,19 @@ public:
   }
 
   friend class LogicNetwork;
+};
+
+// Hash and Equality functions for Node pointers, used in unordered maps
+struct NodePtrHash {
+  std::size_t operator()(const Node *node) const {
+    return std::hash<std::string>()(node->name);
+  }
+};
+
+struct NodePtrEqual {
+  bool operator()(const Node *lhs, const Node *rhs) const {
+    return lhs->name == rhs->name;
+  }
 };
 
 /// Manages a collection of interconnected nodes representing a
@@ -224,7 +235,9 @@ public:
 
   // Returns the Nodes in topological order. Nodes were sorted in topological
   // order when LogicNetwork class is instantiated.
-  std::vector<Node *> getNodesInOrder() { return nodesTopologicalOrder; }
+  std::vector<Node *> getNodesInTopologicalOrder() {
+    return nodesTopologicalOrder;
+  }
 
   // Returns Inputs of the Blif file.
   std::set<Node *> getInputs();

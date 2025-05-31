@@ -1,11 +1,13 @@
 add_dynamatic_library(DynamaticExperimentalSupport
+  BlifReader.cpp
+  CutlessMapping.cpp
   CDGAnalysis.cpp
   StdProfiler.cpp
   HandshakeSimulator.cpp
+  FtdImplementation.cpp
   FtdSupport.cpp
-  CutEnumeration.cpp
-  BlifReader.cpp
   SubjectGraph.cpp
+  FormalProperty.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR

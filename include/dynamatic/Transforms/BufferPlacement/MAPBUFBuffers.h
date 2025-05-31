@@ -24,7 +24,8 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "experimental/Support/BlifReader.h"
-#include "experimental/Support/CutEnumeration.h"
+#include "experimental/Support/CutlessMapping.h"
+#include <boost/functional/hash/extensions.hpp>
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"

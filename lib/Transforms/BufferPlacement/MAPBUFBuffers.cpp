@@ -15,13 +15,14 @@
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/BlifReader.h"
-#include "experimental/Support/CutEnumeration.h"
+#include "experimental/Support/CutlessMapping.h"
 #include "experimental/Support/SubjectGraph.h"
 #include "gurobi_c.h"
 #include "mlir/IR/OperationSupport.h"
@@ -62,59 +63,69 @@ MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
 
 void MAPBUFBuffers::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
-  for (auto [channel, channelVars] : vars.channelVars) {
+  for (auto [channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
-    unsigned numSlotsToPlace = static_cast<unsigned>(
-        channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+    unsigned numSlotsToPlace =
+        static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
     if (numSlotsToPlace == 0)
       continue;
 
-    bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
+    bool forceBreakDV = chVars.signalVars[SignalType::DATA].bufPresent.get(
+                            GRB_DoubleAttr_X) > 0;
+    bool forceBreakR = chVars.signalVars[SignalType::READY].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
-    bool placeTransparent =
-        channelVars.signalVars[SignalType::READY].bufPresent.get(
-            GRB_DoubleAttr_X) > 0;
 
-    handshake::ChannelBufProps &props = channelProps[channel];
     PlacementResult result;
-    if (placeOpaque && placeTransparent) {
-      // Place the minumum number of opaque slots; at least one and enough to
-      // satisfy all our opaque/transparent requirements
-      if (props.maxTrans) {
-        // We must place enough opaque slots as to not exceed the maximum number
-        // of transparent slots
-        result.numOpaque =
-            std::max(props.minOpaque, numSlotsToPlace - *props.maxTrans);
+    // 1. If breaking DV & R:
+    // When numslot = 1, map to ONE_SLOT_BREAK_DVR;
+    // When numslot > 1, map to ONE_SLOT_BREAK_DV + (numslot - 2) *
+    //                            FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
+    //
+    // 2. If only breaking DV:
+    // Map to ONE_SLOT_BREAK_DV + (numslot - 1) * FIFO_BREAK_NONE.
+    //
+    // 3. If only breaking R:
+    // Map to ONE_SLOT_BREAK_R + (numslot - 1) * FIFO_BREAK_NONE.
+    //
+    // 4. If breaking none:
+    // Map to numslot * FIFO_BREAK_NONE.
+    if (forceBreakDV && forceBreakR) {
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotDVR = 1;
       } else {
-        // At least one slot, but no more than necessary
-        result.numOpaque = std::max(props.minOpaque, 1U);
+        result.numOneSlotDV = 1;
+        result.numFifoNone = numSlotsToPlace - 2;
+        result.numOneSlotR = 1;
       }
-      // All remaining slots are transparent
-      result.numTrans = numSlotsToPlace - result.numOpaque;
-    } else if (placeOpaque) {
-      // Place the minimum number of transparent slots; at least the expected
-      // minimum and enough to satisfy all our opaque/transparent requirements
-      if (props.maxOpaque) {
-        result.numTrans =
-            std::max(props.minTrans, numSlotsToPlace - *props.maxOpaque);
-      } else {
-        result.numTrans = props.minTrans;
-      }
-      // All remaining slots are opaque
-      result.numOpaque = numSlotsToPlace - result.numTrans;
+    } else if (forceBreakDV) {
+      result.numOneSlotDV = 1;
+      result.numFifoNone = numSlotsToPlace - 1;
+    } else if (forceBreakR) {
+      result.numOneSlotR = 1;
+      result.numFifoNone = numSlotsToPlace - 1;
     } else {
-      // placeOpaque == 0 --> props.minOpaque == 0 so all slots can be
-      // transparent
-      result.numTrans = numSlotsToPlace;
+      result.numFifoNone = numSlotsToPlace;
     }
 
-    result.deductInternalBuffers(Channel(channel), timingDB);
     placement[channel] = result;
   }
 
   if (logger)
     logResults(placement);
+
+  llvm::MapVector<size_t, double> cfdfcTPResult;
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+
+    cfdfcTPResult[idx] = tmpThroughput;
+  }
+
+  // Create and add the handshake.tp attribute
+  auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
+      funcInfo.funcOp.getContext(), cfdfcTPResult);
+  setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
 }
 
 bool isOperationType(Operation *op, std::string_view type) {
@@ -495,7 +506,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes() {
     return variableExists(model, channelName);
   };
 
-  for (auto *node : blifData->getNodesInOrder()) {
+  for (auto *node : blifData->getNodesInTopologicalOrder()) {
     experimental::MILPVarsSubjectGraph *vars = node->gurobiVars;
     GRBVar &nodeVarIn = vars->tIn;
     GRBVar &nodeVarOut = vars->tOut;
@@ -567,7 +578,7 @@ void MAPBUFBuffers::connectSubjectGraphs() {
   for (auto *module : experimental::BaseSubjectGraph::subjectGraphVector) {
     experimental::LogicNetwork *blifModule = module->blifData;
 
-    for (auto &node : blifModule->getNodesInOrder()) {
+    for (auto &node : blifModule->getNodesInTopologicalOrder()) {
       mergedBlif->addNode(node);
     }
 
@@ -651,7 +662,7 @@ void MAPBUFBuffers::setup() {
     allChannels.push_back(channel);
     addChannelVars(channel, signals);
     addCustomChannelConstraints(channel);
-    addChannelElasticityConstraints(channel, bufGroups);
+    addBufferingGroupConstraints(channel, bufGroups);
     addBlackboxConstraints(channel);
 
     for (SignalType signal : signals) {
@@ -665,9 +676,9 @@ void MAPBUFBuffers::setup() {
            !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin());
   };
 
-  for (Operation &op : funcInfo.funcOp.getOps()) {
-    addUnitElasticityConstraints(&op, channelFilter);
-  }
+  // for (Operation &op : funcInfo.funcOp.getOps()) {
+  //   addUnitElasticityConstraints(&op, channelFilter);
+  // }
 
   // The generator class to initialize the subject graphs of the modules
   experimental::SubjectGraphGenerator generateSubjectGraph(funcInfo.funcOp,
@@ -699,11 +710,12 @@ void MAPBUFBuffers::setup() {
       continue;
     cfdfcs.push_back(cfdfc);
     addCFDFCVars(*cfdfc);
-    addChannelThroughputConstraints(*cfdfc);
+    addSteadyStateReachabilityConstraints(*cfdfc);
+    addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
   }
 
-  addObjective(allChannels, cfdfcs);
+  addMaxThroughputObjective(allChannels, cfdfcs);
   markReadyToOptimize();
 }
 

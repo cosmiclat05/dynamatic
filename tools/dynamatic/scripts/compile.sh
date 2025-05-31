@@ -21,6 +21,7 @@ CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
+DYNAMATIC_EXPORT_CFG_BIN="$DYNAMATIC_DIR/bin/export-cfg"
 
 # Generated directories/files
 COMP_DIR="$OUTPUT_DIR/comp"
@@ -54,6 +55,23 @@ export_dot() {
 
   # Export to DOT
   "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" \
+    > "$f_dot"
+  exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
+
+  # Convert DOT graph to PNG
+  dot -Tpng "$f_dot" > "$f_png"
+  exit_on_fail "Failed to convert $2 DOT to PNG" "Converted $2 DOT to PNG"
+  return 0
+}
+
+export_cfg() {
+  local f_cf="$1"
+  local f_dot="$COMP_DIR/$2.dot"
+  local f_png="$COMP_DIR/$2.png"
+
+
+  # Export to DOT
+  "$DYNAMATIC_EXPORT_CFG_BIN" "$f_cf" \
     > "$f_dot"
   exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
 
@@ -164,7 +182,7 @@ else
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs blif-files=$DYNAMATIC_DIR/data/blif_files/" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs blif-files=$DYNAMATIC_DIR/data/aig/" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null
@@ -174,12 +192,12 @@ fi
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
-  --handshake-reshape-channels \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
+export_cfg "$F_CF_DYN_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
 # handshake level -> hw level
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
