@@ -402,7 +402,8 @@ void MAPBUFBuffers::addCutLoopbackBuffers() {
           }
 
           // Insert buffers in the Subject Graph
-          experimental::BufferSubjectGraph::createBuffers(op, user);
+          experimental::BufferSubjectGraph::createAndInsertNewBuffer(
+              op, user, "one_slot_break_dvr");
         }
       }
     }
@@ -489,7 +490,8 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
             }
 
             // Insert buffers in the Subject Graph
-            experimental::BufferSubjectGraph::createBuffers(inputOp, outputOp);
+            experimental::BufferSubjectGraph::createAndInsertNewBuffer(
+                inputOp, outputOp, "one_slot_break_dvr");
           }
         }
       }

@@ -81,7 +81,8 @@ void BaseSubjectGraph::loadBlifFile(std::initializer_list<unsigned int> inputs,
                                     std::string to_append) {
   std::string moduleType;
   std::string fullPath;
-  moduleType = op->getName().getStringRef();
+
+  moduleType = moduleType = op->getName().getStringRef();
   // Erase the dialect name from the moduleType
   moduleType = moduleType.substr(moduleType.find('.') + 1) + to_append;
 
@@ -155,8 +156,8 @@ void BaseSubjectGraph::processNodesWithRules(
   }
 }
 
-void BaseSubjectGraph::insertNewGraph(BaseSubjectGraph *graph1,
-                                      BaseSubjectGraph *graph2) {
+void BaseSubjectGraph::insertNewSubjectGraph(BaseSubjectGraph *graph1,
+                                             BaseSubjectGraph *graph2) {
   subjectGraphVector.push_back(this);
   inputSubjectGraphs.push_back(graph1);
   outputSubjectGraphs.push_back(graph2);
@@ -682,6 +683,8 @@ ChannelSignals &BranchSinkSubjectGraph::returnOutputNodes(unsigned int) {
 }
 
 void BufferSubjectGraph::initBuffer() {
+  // We cannot use the loadBlifFile method here because the getName() method for
+  // Buffer Operations does not return buffer
   std::string fullPath = baseBlifPath;
   if (dataWidth == 0) {
     bufferType += "_dataless";
@@ -704,19 +707,16 @@ void BufferSubjectGraph::initBuffer() {
 // BufferSubjectGraph implementations
 BufferSubjectGraph::BufferSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   auto bufferOp = llvm::dyn_cast<handshake::BufferOp>(op);
+
   auto params =
       bufferOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-  auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
-
-  if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
-    handshake::TimingInfo info = timing.getInfo();
-    if (info == handshake::TimingInfo::oehb())
-      bufferType = "oehb";
-    if (info == handshake::TimingInfo::tehb())
-      bufferType = "tehb";
-  }
+  auto bufferTypeNamed =
+      params.getNamed(handshake::BufferOp::BUFFER_TYPE_ATTR_NAME);
+  auto bufferTypeAttr = dyn_cast<StringAttr>(bufferTypeNamed->getValue());
+  bufferType = bufferTypeAttr.getValue().str();
 
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
+
   initBuffer();
 }
 
@@ -725,7 +725,9 @@ BufferSubjectGraph::BufferSubjectGraph(unsigned int inputDataWidth,
     : BaseSubjectGraph() {
   static unsigned int bufferCount;
   uniqueName = bufferTypeName + "_" + std::to_string(bufferCount++);
+
   bufferType = std::move(bufferTypeName);
+
   dataWidth = inputDataWidth;
 
   initBuffer();

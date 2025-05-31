@@ -27,6 +27,7 @@
 #include <boost/functional/hash/extensions.hpp>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 using namespace mlir;
@@ -107,7 +108,8 @@ public:
   // SubjectGraphs are created
   void buildSubjectGraphConnections();
 
-  void insertNewGraph(BaseSubjectGraph *graph1, BaseSubjectGraph *graph2);
+  void insertNewSubjectGraph(BaseSubjectGraph *graph1,
+                             BaseSubjectGraph *graph2);
 
   virtual ~BaseSubjectGraph() = default;
 
@@ -304,23 +306,12 @@ public:
   ChannelSignals &returnOutputNodes(unsigned int) override;
 };
 
-enum class BufferType { OEHB, TEHB };
-
 class BufferSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
   ChannelSignals inputNodes;
   ChannelSignals outputNodes;
   std::string bufferType;
-
-  static std::string getBufferTypeName(BufferType type) {
-    switch (type) {
-    case BufferType::OEHB:
-      return "oehb";
-    case BufferType::TEHB:
-      return "tehb";
-    }
-  }
 
 public:
   BufferSubjectGraph(Operation *op);
@@ -333,24 +324,29 @@ public:
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int) override;
 
-  // Inserts a pair of OEHB and TEHB buffers between two operations. Used to cut
-  // loopbacks.
-  static void createBuffers(Operation *inputOp, Operation *outputOp) {
+  // Creates a new Buffer SubjectGraph, and inserts it into the middle of 2
+  // other SubjectGraphs, given by the input and output Ops.
+  static void createAndInsertNewBuffer(Operation *inputOp, Operation *outputOp,
+                                       std::string bufferTypeName) {
+    // Get the SubjectGraphs of the operations
     BaseSubjectGraph *graph1 = moduleMap[inputOp];
     BaseSubjectGraph *graph2 = moduleMap[outputOp];
+
+    // Get the channel number between inputOp and outputOp, so that we place the
+    // buffer on the correct channel
     unsigned int channelNum = graph2->inputSubjectGraphToResultNumber[graph1];
     ChannelSignals &channel = graph1->returnOutputNodes(channelNum);
+
+    // Data width of the channel between the Ops. New buffer should have the
+    // same data width.
     unsigned int inputDataWidth = channel.dataSignals.size();
 
-    BufferSubjectGraph *oehb = new BufferSubjectGraph(
-        inputDataWidth, getBufferTypeName(BufferType::OEHB));
+    // Create the new buffer.
+    BufferSubjectGraph *breakDvr =
+        new BufferSubjectGraph(inputDataWidth, std::move(bufferTypeName));
 
-    oehb->insertNewGraph(graph1, graph2);
-
-    BufferSubjectGraph *tehb = new BufferSubjectGraph(
-        inputDataWidth, getBufferTypeName(BufferType::TEHB));
-
-    tehb->insertNewGraph(oehb, graph2);
+    // Insert the new BufferSubjectGraph in between the 2 SubjectGraphs
+    breakDvr->insertNewSubjectGraph(graph1, graph2);
   }
 
   void initBuffer();
