@@ -155,6 +155,31 @@ void BaseSubjectGraph::processNodesWithRules(
   }
 }
 
+void BaseSubjectGraph::insertNewGraph(BaseSubjectGraph *graph1,
+                                      BaseSubjectGraph *graph2) {
+  subjectGraphVector.push_back(this);
+  inputSubjectGraphs.push_back(graph1);
+  outputSubjectGraphs.push_back(graph2);
+
+  unsigned int channelNum = graph2->inputSubjectGraphToResultNumber[graph1];
+  inputSubjectGraphToResultNumber[graph1] = channelNum;
+  graph2->inputSubjectGraphToResultNumber.erase(graph1);
+  graph2->inputSubjectGraphToResultNumber[this] = channelNum;
+
+  // Delete the SubjectGraph from the input/output vector and insert the new
+  // SubjectGraph.
+  auto changeIO = [&](BaseSubjectGraph *prevIO,
+                      std::vector<BaseSubjectGraph *> &inputOutput) {
+    auto it = std::find(inputOutput.begin(), inputOutput.end(), prevIO);
+    auto index = std::distance(inputOutput.begin(), it);
+    inputOutput.erase(it);
+    inputOutput.insert(inputOutput.begin() + index, this);
+  };
+
+  changeIO(graph1, graph2->inputSubjectGraphs);
+  changeIO(graph2, graph1->outputSubjectGraphs);
+}
+
 // ArithSubjectGraph implementation
 ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
@@ -685,9 +710,9 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
     handshake::TimingInfo info = timing.getInfo();
-    if (info == handshake::TimingInfo::break_dv())
+    if (info == handshake::TimingInfo::oehb())
       bufferType = "oehb";
-    if (info == handshake::TimingInfo::break_r())
+    if (info == handshake::TimingInfo::tehb())
       bufferType = "tehb";
   }
 
@@ -695,59 +720,14 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   initBuffer();
 }
 
-void BufferSubjectGraph::insertBuffer(BaseSubjectGraph *graph1,
-                                      BaseSubjectGraph *graph2) {
-  subjectGraphVector.push_back(this);
-  inputSubjectGraphs.push_back(graph1);
-  outputSubjectGraphs.push_back(graph2);
-
-  unsigned int channelNum = graph2->inputSubjectGraphToResultNumber[graph1];
-  inputSubjectGraphToResultNumber[graph1] = channelNum;
-  graph2->inputSubjectGraphToResultNumber.erase(graph1);
-  graph2->inputSubjectGraphToResultNumber[this] = channelNum;
-
-  ChannelSignals &channel = graph1->returnOutputNodes(channelNum);
-  dataWidth = channel.dataSignals.size();
-
-  // Delete the SubjectGraph from the input/output vector and insert the new
-  // SubjectGraph.
-  auto changeIO = [&](BaseSubjectGraph *prevIO,
-                      std::vector<BaseSubjectGraph *> &inputOutput) {
-    auto it = std::find(inputOutput.begin(), inputOutput.end(), prevIO);
-    auto index = std::distance(inputOutput.begin(), it);
-    inputOutput.erase(it);
-    inputOutput.insert(inputOutput.begin() + index, this);
-  };
-
-  changeIO(graph1, graph2->inputSubjectGraphs);
-  changeIO(graph2, graph1->outputSubjectGraphs);
-}
-
-BufferSubjectGraph::BufferSubjectGraph(Operation *op1, Operation *op2,
+BufferSubjectGraph::BufferSubjectGraph(unsigned int inputDataWidth,
                                        std::string bufferTypeName)
     : BaseSubjectGraph() {
   static unsigned int bufferCount;
-  uniqueName = "oehb_" + std::to_string(bufferCount++);
+  uniqueName = bufferTypeName + "_" + std::to_string(bufferCount++);
   bufferType = std::move(bufferTypeName);
+  dataWidth = inputDataWidth;
 
-  BaseSubjectGraph *graph1 = moduleMap[op1];
-  BaseSubjectGraph *graph2 = moduleMap[op2];
-
-  insertBuffer(graph1, graph2);
-  initBuffer();
-}
-
-BufferSubjectGraph::BufferSubjectGraph(BufferSubjectGraph *graph1,
-                                       Operation *op2,
-                                       std::string bufferTypeName)
-    : BaseSubjectGraph() {
-  static unsigned int bufferCount;
-  uniqueName = "tehb_" + std::to_string(bufferCount++);
-  bufferType = std::move(bufferTypeName);
-
-  BaseSubjectGraph *graph2 = moduleMap[op2];
-
-  insertBuffer(graph1, graph2);
   initBuffer();
 }
 

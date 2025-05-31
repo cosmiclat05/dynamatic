@@ -107,6 +107,8 @@ public:
   // SubjectGraphs are created
   void buildSubjectGraphConnections();
 
+  void insertNewGraph(BaseSubjectGraph *graph1, BaseSubjectGraph *graph2);
+
   virtual ~BaseSubjectGraph() = default;
 
   // Each Subject Graph implements its own connectInputNodes() function.
@@ -322,10 +324,11 @@ private:
 
 public:
   BufferSubjectGraph(Operation *op);
-  BufferSubjectGraph(Operation *op1, Operation *op2,
-                     std::string bufferTypeName);
-  BufferSubjectGraph(BufferSubjectGraph *graph1, Operation *op2,
-                     std::string bufferTypeName);
+  BufferSubjectGraph(unsigned int inputDataWidth, std::string bufferTypeName);
+  // BufferSubjectGraph(Operation *op1, Operation *op2,
+  //                    std::string bufferTypeName);
+  // BufferSubjectGraph(BufferSubjectGraph *graph1, Operation *op2,
+  //                    std::string bufferTypeName);
 
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int) override;
@@ -333,16 +336,23 @@ public:
   // Inserts a pair of OEHB and TEHB buffers between two operations. Used to cut
   // loopbacks.
   static void createBuffers(Operation *inputOp, Operation *outputOp) {
-    // Create OEHB buffer using the temporary string
-    BufferSubjectGraph *oehb = new BufferSubjectGraph(
-        inputOp, outputOp, getBufferTypeName(BufferType::OEHB));
+    BaseSubjectGraph *graph1 = moduleMap[inputOp];
+    BaseSubjectGraph *graph2 = moduleMap[outputOp];
+    unsigned int channelNum = graph2->inputSubjectGraphToResultNumber[graph1];
+    ChannelSignals &channel = graph1->returnOutputNodes(channelNum);
+    unsigned int inputDataWidth = channel.dataSignals.size();
 
-    // Create TEHB buffer that connects to OEHB
+    BufferSubjectGraph *oehb = new BufferSubjectGraph(
+        inputDataWidth, getBufferTypeName(BufferType::OEHB));
+
+    oehb->insertNewGraph(graph1, graph2);
+
     BufferSubjectGraph *tehb = new BufferSubjectGraph(
-        oehb, outputOp, getBufferTypeName(BufferType::TEHB));
+        inputDataWidth, getBufferTypeName(BufferType::TEHB));
+
+    tehb->insertNewGraph(oehb, graph2);
   }
 
-  void insertBuffer(BaseSubjectGraph *graph1, BaseSubjectGraph *graph2);
   void initBuffer();
 };
 
